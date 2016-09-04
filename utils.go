@@ -77,9 +77,8 @@ func getHMACFromFile(filepath string) ([]byte, error) {
 			return hmacBytes, nil
 		}
 		return nil, err
-	} else {
-		return nil, err
 	}
+	return nil, err
 }
 
 func truncateHMACSignature(filepath string) error {

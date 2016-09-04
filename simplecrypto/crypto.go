@@ -97,17 +97,14 @@ func DecryptText(cryptoText string, key []byte) (string, error) {
 
 func EncryptFile(filename string, key []byte) (string, []byte, error) {
 	outputFilename := fmt.Sprintf("%s.%s", filename, "enc")
-	fmt.Println("Opening: " + outputFilename)
 	readFile, err := os.Open(filename)
 
 	if err != nil {
-		fmt.Println("Opening file for reading")
 		return "", nil, err
 	}
 
 	writeFile, err := os.OpenFile(outputFilename, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0600)
 	if err != nil {
-		fmt.Println("Opening file")
 		return "", nil, err
 	}
 
@@ -138,9 +135,6 @@ func DecryptFile(filename string, key []byte) (string, error) {
 	iv := make([]byte, aes.BlockSize)
 
 	readFile, err := os.Open(filename)
-
-	finfo, _ := readFile.Stat()
-	fmt.Println(finfo.Size())
 
 	cwd, _ := os.Getwd()
 	decryptedFilename, _ := ioutil.TempFile(cwd, "plaintext")

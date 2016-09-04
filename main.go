@@ -113,7 +113,7 @@ func doDownload(bs *bucketService, keys simplecrypto.Keys, filename string) {
 	actualHMAC := simplecrypto.CalculateHMAC(keys.HmacKey, iv, downloadedEncryptedFile, true)
 
 	if expectedHMAC, err := getHMACFromFile(downloadedEncryptedFile); err == nil {
-		if bytes.Equal(actualHMAC, expectedHMAC) == false {
+		if !bytes.Equal(actualHMAC, expectedHMAC) {
 			panic("File has been tampered with!")
 		}
 	} else {
