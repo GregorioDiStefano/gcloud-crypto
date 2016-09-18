@@ -7,18 +7,34 @@ import (
 	"crypto/rand"
 	"crypto/sha256"
 	"encoding/base64"
+	"errors"
 	"fmt"
+	"io"
 	"io/ioutil"
+	"os"
+	"syscall"
 
 	"golang.org/x/crypto/scrypt"
-
-	"io"
-	"os"
 )
 
 type Keys struct {
 	EncryptionKey []byte
-	HmacKey       []byte
+	HMACKey       []byte
+}
+
+func checkFreeDiskspace() (uint64, error) {
+	var stat syscall.Statfs_t
+
+	wd, err := os.Getwd()
+
+	if err != nil {
+		return 0, err
+	}
+
+	syscall.Statfs(wd, &stat)
+
+	// Available blocks * size per block = available space in bytes
+	return (stat.Bavail * uint64(stat.Bsize)), nil
 }
 
 func randomBytes(length int) []byte {
@@ -34,21 +50,21 @@ func GenerateRandomIV() []byte {
 	return randomBytes(aes.BlockSize)
 }
 
-func GetKeyFromPassphrase(passphrase, salt []byte) *Keys {
+func GetKeyFromPassphrase(passphrase, salt []byte) (*Keys, error) {
 	if passphrase == nil || salt == nil {
-		panic("missing passphrase or salt required to generate crypto keys")
+		return nil, errors.New("No password or salt provided")
 	}
 
-	k, err := scrypt.Key([]byte(passphrase), salt, 16384, 16, 1, 64)
+	k, err := scrypt.Key([]byte(passphrase), salt, 4096, 16, 1, 64)
 
 	if err != nil {
-		panic(err)
+		return nil, err
 	}
 
 	dk := k[:32]
 	mk := k[32:64]
 
-	return &Keys{dk, mk}
+	return &Keys{dk, mk}, nil
 }
 
 func EncryptText(text string, key []byte) (string, error) {
@@ -73,6 +89,11 @@ func EncryptText(text string, key []byte) (string, error) {
 
 func DecryptText(cryptoText string, key []byte) (string, error) {
 	ciphertext, _ := base64.URLEncoding.DecodeString(cryptoText)
+
+	if len(ciphertext) < 12 {
+		return "", errors.New("ciphertext too small to be encrypted")
+	}
+
 	nonce := ciphertext[:12]
 	ciphertext = ciphertext[12:]
 
@@ -142,21 +163,18 @@ func DecryptFile(filename string, key []byte) (string, error) {
 	writeFile, err := os.OpenFile(decryptedFilename.Name(), os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0600)
 
 	if err != nil {
-		panic(err)
+		return "", err
 	}
 
 	defer readFile.Close()
 	defer writeFile.Close()
 
-	if err != nil {
-		panic(err)
-	}
-
 	readFile.Read(iv)
 
 	block, err := aes.NewCipher(key)
+
 	if err != nil {
-		panic(err)
+		return "", err
 	}
 
 	stream := cipher.NewCTR(block, iv)
@@ -170,16 +188,21 @@ func DecryptFile(filename string, key []byte) (string, error) {
 	return decryptedFilename.Name(), nil
 }
 
-func GetIVFromEncryptedFile(filename string) []byte {
+func GetIVFromEncryptedFile(filename string) ([]byte, error) {
 	readFile, err := os.Open(filename)
 	iv := make([]byte, aes.BlockSize)
 
 	if err != nil {
-		panic(err)
+		return nil, errors.New("Unable to open file")
 	}
 
-	readFile.Read(iv)
-	return iv
+	bytesRead, err := readFile.Read(iv)
+
+	if bytesRead < aes.BlockSize || err != nil {
+		return nil, errors.New("Error reading IV from file")
+	}
+
+	return iv, nil
 }
 
 // compute HMAC-SHA256 as: hmac(key, IV + cipherText)

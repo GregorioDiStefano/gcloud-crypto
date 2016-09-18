@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"os"
 	"strings"
 
@@ -34,14 +35,13 @@ func encryptFilePath(path string, key []byte) string {
 
 func decryptFilePath(encryptedPath string, key []byte) string {
 	splitPath := strings.Split(encryptedPath, "/")
-
 	var decryptedPath []string
 
 	for _, e := range splitPath {
 		if t, err := simplecrypto.DecryptText(e, key); err == nil {
 			decryptedPath = append(decryptedPath, t)
 		} else {
-			decryptedPath = []string{"error decrypting filepath"}
+			decryptedPath = []string{fmt.Sprintf("(error decrypting filepath) %s", encryptedPath)}
 		}
 	}
 
@@ -87,4 +87,11 @@ func truncateHMACSignature(filepath string) error {
 	} else {
 		return err
 	}
+}
+
+func isDir(filepath string) bool {
+	if fileStat, err := os.Stat(filepath); err == nil {
+		return fileStat.IsDir()
+	}
+	return false
 }

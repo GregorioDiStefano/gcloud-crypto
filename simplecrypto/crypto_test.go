@@ -4,13 +4,13 @@ import (
 	"crypto/aes"
 	"crypto/rand"
 	"encoding/base64"
+	"encoding/hex"
 	"errors"
+	"github.com/stretchr/testify/assert"
 	"io"
 	"io/ioutil"
 	"os"
 	"testing"
-
-	"github.com/stretchr/testify/assert"
 )
 
 func randomByte(length int) []byte {
@@ -101,8 +101,27 @@ func TestEncryptDecryptFile(t *testing.T) {
 
 	assert.Equal(t, decryptedDataBytes, dataToEncrypt)
 
-	dataFile.Close()
-
 	os.Remove(dataFile.Name())
 	os.Remove(plainTextFile)
+}
+
+func TestCalculateHMAC(t *testing.T) {
+	t.Parallel()
+	dataFile, _ := ioutil.TempFile(os.TempDir(), "test")
+	dataFile.Write([]byte("payload1234"))
+	dataFile.Close()
+
+	HMACAsHex := hex.EncodeToString(CalculateHMAC([]byte("foobar"), []byte("longtestiv123456"), dataFile.Name(), false))
+
+	assert.Equal(t, HMACAsHex, "9f705902feb423df9216dc6e97ca8e30ce7edad53ac10dd84a34377efcc24dcc")
+}
+
+func TestGetKeyFromPassphrase(t *testing.T) {
+	t.Parallel()
+	key, _ := GetKeyFromPassphrase([]byte("password"), []byte("salt"))
+
+	keyAsByte, _ := hex.DecodeString("ecdaab8f7ea0ea6f4b9f4e930cef2a1bb277736f64c971c43ca5d73cfb4bb80ff4fdba62d7a91d9d6ede70f8f7be28d8e161aa1b6962a7e577ffb9aa74a934ed")
+
+	actualKey := &Keys{keyAsByte[:32], keyAsByte[32:64]}
+	assert.Equal(t, key, actualKey)
 }
