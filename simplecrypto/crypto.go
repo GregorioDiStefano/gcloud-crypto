@@ -12,7 +12,6 @@ import (
 	"io"
 	"io/ioutil"
 	"os"
-	"syscall"
 
 	"golang.org/x/crypto/scrypt"
 )
@@ -22,6 +21,18 @@ type Keys struct {
 	HMACKey       []byte
 }
 
+const (
+	unableToOpenFileReading = "Unable to open file for reading"
+	unableToOpenFileWriting = "Unable to open file for writing"
+	noSaltOrPassword        = "No salt or password provided"
+	saltTooSmall            = "Salt is too small, 64 bits needed"
+	notEncrypted            = "Ciphertext too small to be encrypted"
+
+	errorReadingIV   = "Unable to read IV from file"
+	errorReadingHMAC = "Unable to extract HMAC from file"
+)
+
+/*
 func checkFreeDiskspace() (uint64, error) {
 	var stat syscall.Statfs_t
 
@@ -36,7 +47,7 @@ func checkFreeDiskspace() (uint64, error) {
 	// Available blocks * size per block = available space in bytes
 	return (stat.Bavail * uint64(stat.Bsize)), nil
 }
-
+*/
 func randomBytes(length int) []byte {
 	rb := make([]byte, length)
 	if _, err := io.ReadFull(rand.Reader, rb); err != nil {
@@ -52,7 +63,11 @@ func GenerateRandomIV() []byte {
 
 func GetKeyFromPassphrase(passphrase, salt []byte) (*Keys, error) {
 	if passphrase == nil || salt == nil {
-		return nil, errors.New("No password or salt provided")
+		return nil, errors.New(noSaltOrPassword)
+	}
+
+	if len(salt) < 8 {
+		return nil, errors.New(saltTooSmall)
 	}
 
 	k, err := scrypt.Key([]byte(passphrase), salt, 4096, 16, 1, 64)
@@ -91,7 +106,7 @@ func DecryptText(cryptoText string, key []byte) (string, error) {
 	ciphertext, _ := base64.URLEncoding.DecodeString(cryptoText)
 
 	if len(ciphertext) < 12 {
-		return "", errors.New("ciphertext too small to be encrypted")
+		return "", errors.New(notEncrypted)
 	}
 
 	nonce := ciphertext[:12]
@@ -145,7 +160,7 @@ func EncryptFile(filename string, key []byte) (string, []byte, error) {
 	writeFile.Write(iv)
 
 	if _, err := io.Copy(writer, readFile); err != nil {
-		fmt.Println("error during crypto")
+		fmt.Println("error during crypto: " + err.Error())
 		return "", nil, err
 	}
 
@@ -193,36 +208,36 @@ func GetIVFromEncryptedFile(filename string) ([]byte, error) {
 	iv := make([]byte, aes.BlockSize)
 
 	if err != nil {
-		return nil, errors.New("Unable to open file")
+		return nil, errors.New(unableToOpenFileReading)
 	}
 
-	bytesRead, err := readFile.Read(iv)
-
-	if bytesRead < aes.BlockSize || err != nil {
-		return nil, errors.New("Error reading IV from file")
+	if bytesRead, err := readFile.Read(iv); bytesRead < aes.BlockSize || err != nil {
+		return nil, errors.New(errorReadingIV)
 	}
 
 	return iv, nil
 }
 
 // compute HMAC-SHA256 as: hmac(key, IV + cipherText)
-func CalculateHMAC(key, iv []byte, filepath string, skipLast32bytes bool) []byte {
+func CalculateHMAC(key, iv []byte, filepath string, skipLast32bytes bool) ([]byte, error) {
+	const idealBufferSize = 16 * 1024
+	var fileSize, bytesCounted int64
+
 	f, err := os.Open(filepath)
 	defer f.Close()
 
-	const idealBufferSize = 16 * 1024
-
 	if err != nil {
-		panic(err)
+		return nil, errors.New(unableToOpenFileReading)
 	}
 
-	fileStat, _ := f.Stat()
-	fileSize := fileStat.Size()
+	if fileStat, err := f.Stat(); err == nil {
+		fileSize = fileStat.Size()
+	} else {
+		return nil, err
+	}
 
 	hash := hmac.New(sha256.New, key)
 	hash.Write(iv)
-
-	bytesCounted := int64(0)
 
 	for {
 		var data []byte
@@ -250,5 +265,58 @@ func CalculateHMAC(key, iv []byte, filepath string, skipLast32bytes bool) []byte
 		}
 	}
 
-	return hash.Sum(nil)
+	return hash.Sum(nil), nil
+}
+
+func GetHMACFromFile(filepath string) ([]byte, error) {
+	f, err := os.Open(filepath)
+	if err != nil {
+		return nil, errors.New(unableToOpenFileReading)
+	}
+
+	defer f.Close()
+
+	hmacBytes := make([]byte, sha256.Size)
+
+	if fileStat, err := f.Stat(); err == nil && fileStat.Size() < sha256.Size {
+		return nil, errors.New(errorReadingHMAC)
+	}
+
+	if fileStat, err := f.Stat(); err == nil {
+		fileSize := fileStat.Size()
+		if _, err := f.ReadAt(hmacBytes, fileSize-sha256.Size); err == nil {
+			return hmacBytes, nil
+		}
+		return nil, err
+	}
+	return nil, err
+}
+
+func TruncateHMACSignature(filepath string) error {
+	if fileStat, err := os.Stat(filepath); err != nil || fileStat.Size() < sha256.Size {
+		return errors.New(errorReadingHMAC)
+	}
+
+	if fileStat, err := os.Stat(filepath); err == nil {
+		return os.Truncate(filepath, fileStat.Size()-sha256.Size)
+	} else {
+		return err
+	}
+}
+
+func AddHMACToFile(filepath string, hmac []byte) error {
+	if len(hmac) != sha256.Size {
+		panic("Adding HMAC of incorrect size, this should never happen")
+	}
+
+	f, err := os.OpenFile(filepath, os.O_APPEND|os.O_WRONLY, 0600)
+	defer f.Close()
+
+	if err != nil {
+		return errors.New(unableToOpenFileWriting)
+	}
+
+	f.Write(hmac)
+
+	return nil
 }

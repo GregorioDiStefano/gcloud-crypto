@@ -49,46 +49,6 @@ func decryptFilePath(encryptedPath string, key []byte) string {
 	return entireDecryptedPath
 }
 
-func addHMACToFile(filepath string, hmac []byte) error {
-	f, err := os.OpenFile(filepath, os.O_APPEND|os.O_WRONLY, 0600)
-	defer f.Close()
-
-	if err != nil {
-		return err
-	}
-
-	f.Write(hmac)
-
-	return nil
-}
-
-func getHMACFromFile(filepath string) ([]byte, error) {
-	f, err := os.Open(filepath)
-	defer f.Close()
-	hmacBytes := make([]byte, 32)
-
-	if err != nil {
-		return nil, err
-	}
-
-	if fileStat, err := f.Stat(); err == nil {
-		fileSize := fileStat.Size()
-		if _, err := f.ReadAt(hmacBytes, fileSize-32); err == nil {
-			return hmacBytes, nil
-		}
-		return nil, err
-	}
-	return nil, err
-}
-
-func truncateHMACSignature(filepath string) error {
-	if fileStat, err := os.Stat(filepath); err == nil {
-		return os.Truncate(filepath, fileStat.Size()-32)
-	} else {
-		return err
-	}
-}
-
 func isDir(filepath string) bool {
 	if fileStat, err := os.Stat(filepath); err == nil {
 		return fileStat.IsDir()
