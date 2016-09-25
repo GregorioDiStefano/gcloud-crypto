@@ -1,8 +1,6 @@
 package main
 
 import (
-	"bufio"
-	"bytes"
 	"errors"
 	"flag"
 	"fmt"
@@ -10,7 +8,6 @@ import (
 	"log"
 	"os"
 	"path"
-	"path/filepath"
 	"syscall"
 
 	"github.com/GregorioDiStefano/gcloud-fuse/simplecrypto"
@@ -70,11 +67,7 @@ func main() {
 	}
 
 	if flag.Lookup("i").Value.String() == "true" {
-		for {
-			reader := bufio.NewReader(os.Stdin)
-			fmt.Print("> ")
-			reader.ReadString('\n')
-		}
+		interactiveMode(bs, *cryptoKeys)
 	} else {
 		parseCmdLine(bs, *cryptoKeys)
 	}
@@ -103,100 +96,10 @@ func verifyPassword(bs *bucketService, cryptoKeys simplecrypto.Keys) error {
 	return nil
 }
 
-func parseCmdLine(bs *bucketService, cryptoKeys simplecrypto.Keys) {
-	var returnedError error
-
-	switch {
-	case flag.Lookup("delete").Value.String() != "":
-		returnedError = doDeleteObject(bs, cryptoKeys, flag.Lookup("delete").Value.String())
-	case flag.Lookup("upload").Value.String() != "":
-		path := flag.Lookup("upload").Value.String()
-		returnedError = processUpload(bs, path, cryptoKeys)
-	case flag.Lookup("download").Value.String() != "":
-		returnedError = doDownload(bs, cryptoKeys, flag.Lookup("download").Value.String())
-	case flag.Lookup("list").Value.String() == "true":
-		printList(bs, cryptoKeys.EncryptionKey)
-	}
-
-	if returnedError != nil {
-		fmt.Println("Action returned error: " + returnedError.Error())
-		os.Exit(1)
-	}
-}
-
-func processUpload(bs *bucketService, path string, cryptoKeys simplecrypto.Keys) error {
-	globMatch, err := filepath.Glob(path)
-	var errorUploading bool
-	fmt.Println(globMatch, err)
-	if err != nil {
-		return err
-	}
-
-	for _, path := range globMatch {
-		fmt.Println("Uploading: " + path)
-		if isDir(path) {
-			err = filepath.Walk(path, func(path string, info os.FileInfo, err error) error {
-				if !isDir(path) {
-					fmt.Println("Uploading: " + path)
-					return doUpload(bs, cryptoKeys, path, flag.Lookup("dir").Value.String())
-				}
-				return nil
-			})
-		} else {
-			err = doUpload(bs, cryptoKeys, path, flag.Lookup("dir").Value.String())
-		}
-
-		if err != nil {
-			errorUploading = true
-			fmt.Println(fmt.Sprintf("failed with %s when uploading: %s", err.Error(), path))
-		}
-	}
-
-	if errorUploading {
-		return errors.New("at least one file failed to upload")
-	}
-	return nil
-}
-
-func doUpload(bs *bucketService, keys simplecrypto.Keys, filePath, remoteDirectory string) error {
-	encryptedFile, iv, _ := simplecrypto.EncryptFile(filePath, keys.EncryptionKey)
-	var encryptedPath string
-
-	if len(remoteDirectory) > 0 {
-		remoteDirectoryFilename := path.Clean(remoteDirectory + "/" + path.Base(filePath))
-		encryptedPath = encryptFilePath(remoteDirectoryFilename, keys.EncryptionKey)
-	} else {
-		encryptedPath = encryptFilePath(filePath, keys.EncryptionKey)
-	}
-
-	if objects, err := bs.getObjects(); err == nil {
-		encToDecPaths := getEncryptedToDecryptedMap(objects, keys.EncryptionKey)
-		for e := range encToDecPaths {
-			//stupid
-			plainTextRemotePath := decryptFilePath(encryptedPath, keys.EncryptionKey)
-			if e == plainTextRemotePath {
-				return errors.New("This file already exists, delete it first.")
-			}
-		}
-	} else {
-		fmt.Println(err)
-	}
-
-	hmac, err := simplecrypto.CalculateHMAC(keys.HMACKey, iv, encryptedFile, false)
-
-	if err != nil {
-		return err
-	}
-
-	simplecrypto.AddHMACToFile(encryptedFile, hmac)
-	bs.uploadToBucket(encryptedFile, encryptedPath)
-	return nil
-}
-
-func printList(bs *bucketService, key []byte) {
+func printList(bs *bucketService, key []byte) error {
 	objects, err := bs.getObjects()
 	if err != nil {
-		panic("failed getting objects:" + err.Error())
+		return err
 	}
 
 	encToDecPaths := getEncryptedToDecryptedMap(objects, key)
@@ -206,6 +109,7 @@ func printList(bs *bucketService, key []byte) {
 		fmt.Println(count, ": ", i)
 		count++
 	}
+	return nil
 }
 
 func doDownload(bs *bucketService, keys simplecrypto.Keys, filename string) error {
@@ -217,64 +121,37 @@ func doDownload(bs *bucketService, keys simplecrypto.Keys, filename string) erro
 
 	encToDecPaths := getEncryptedToDecryptedMap(objects, keys.EncryptionKey)
 
+	foundFile := false
 	for k, _ := range encToDecPaths {
-		//TODO: should be decToEncPaths
-		fmt.Println(filename, k)
 		if glob.Glob(filename, k) {
-			fmt.Println("downloading: " + k)
+			foundFile = true
+
 			encryptedFilepath := encToDecPaths[k]
 			decryptedFilePath := decryptFilePath(encToDecPaths[k], keys.EncryptionKey)
-			downloadedEncryptedFile, _ := bs.downloadFromBucket(encryptedFilepath)
-			defer os.Remove(downloadedEncryptedFile)
-
-			iv, err := simplecrypto.GetIVFromEncryptedFile(downloadedEncryptedFile)
-
-			if err != nil {
-				panic(err)
-			}
-
-			actualHMAC, err := simplecrypto.CalculateHMAC(keys.HMACKey, iv, downloadedEncryptedFile, true)
+			downloadedEncryptedFile, err := bs.downloadFromBucket(encryptedFilepath)
 
 			if err != nil {
 				return err
 			}
 
-			if expectedHMAC, err := simplecrypto.GetHMACFromFile(downloadedEncryptedFile); err == nil {
-				if !bytes.Equal(actualHMAC, expectedHMAC) {
-					panic("file has been tampered with!")
-				}
-			} else {
-				panic(err.Error())
-			}
+			defer os.Remove(downloadedEncryptedFile)
 
-			downloadedPlaintextFile, _ := simplecrypto.DecryptFile(downloadedEncryptedFile, keys.EncryptionKey)
+			downloadedPlaintextFile, err := simplecrypto.DecryptFile(downloadedEncryptedFile, keys)
 			defer os.Remove(downloadedPlaintextFile)
+
+			if err != nil {
+				return err
+			}
 
 			_, tempDownloadFilename := path.Split(downloadedPlaintextFile)
 			_, actualFilename := path.Split(decryptedFilePath)
 
 			os.Rename(tempDownloadFilename, actualFilename)
-			simplecrypto.TruncateHMACSignature(actualFilename)
 			fmt.Println("downloaded: " + actualFilename)
 		}
 	}
+	if !foundFile {
+		return errors.New("No files found")
+	}
 	return nil
-}
-
-func doDeleteObject(bs *bucketService, keys simplecrypto.Keys, filename string) error {
-	objects, err := bs.getObjects()
-
-	if err != nil {
-		return errors.New("failed getting objects: " + err.Error())
-	}
-
-	encToDecPaths := getEncryptedToDecryptedMap(objects, keys.EncryptionKey)
-
-	encryptedFilename := encToDecPaths[filename]
-
-	if encryptedFilename == "" {
-		return fmt.Errorf("file: %s not found in bucket", filename)
-	}
-
-	return bs.deleteObject(encryptedFilename)
 }
