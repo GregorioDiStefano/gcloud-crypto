@@ -123,7 +123,7 @@ func EncryptFile(filename string, keys Keys) (string, error) {
 	defer readFile.Close()
 
 	if err != nil {
-		return "", err
+		return "", errors.New(unableToOpenFileReading)
 	}
 
 	writeFile, err := os.OpenFile(outputFilename, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0600)
@@ -239,24 +239,6 @@ func calculateHMAC(key, iv []byte, fh os.File) ([]byte, error) {
 	}
 
 	return hash.Sum(nil), nil
-}
-
-func getHMACFromFile(fh os.File) ([]byte, error) {
-	hmacBytes := make([]byte, sha256.Size)
-
-	if fileStat, err := fh.Stat(); err == nil && fileStat.Size() < sha256.Size {
-		return nil, errors.New(errorReadingHMAC)
-	}
-
-	if fileStat, err := fh.Stat(); err == nil {
-		fileSize := fileStat.Size()
-		if _, err := fh.ReadAt(hmacBytes, fileSize-sha256.Size); err == nil {
-			return hmacBytes, nil
-		}
-		return nil, err
-	} else {
-		return nil, err
-	}
 }
 
 func truncateHMACSignature(file *os.File) ([]byte, error) {

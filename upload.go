@@ -12,18 +12,33 @@ import (
 
 func doUpload(bs *bucketService, keys simplecrypto.Keys, filePath, remoteDirectory string) error {
 	encryptedFile, _ := simplecrypto.EncryptFile(filePath, keys)
+	fmt.Print("Encrypting complete.")
 	var encryptedPath string
 
-	if len(remoteDirectory) > 0 {
-		remoteDirectoryFilename := path.Clean(remoteDirectory + "/" + path.Base(filePath))
-		encryptedPath = encryptFilePath(remoteDirectoryFilename, keys.EncryptionKey)
-	} else {
-		encryptedPath = encryptFilePath(filePath, keys.EncryptionKey)
-	}
-
 	if objects, err := bs.getObjects(); err == nil {
-		encToDecPaths := getEncryptedToDecryptedMap(objects, keys.EncryptionKey)
-		for e := range encToDecPaths {
+		fmt.Println("Uploading to: ", remoteDirectory)
+
+		decToEncPaths := getDecryptedToEncryptedFileMapping(objects, keys.EncryptionKey)
+
+		for e := range decToEncPaths {
+			//instead of creating a new "directory", check if a directory already exists, and use it
+			if len(remoteDirectory) > 0 {
+				if filepath.Dir(e) == remoteDirectory {
+					fmt.Println("using existing directory: ", filepath.Dir(decToEncPaths[e]))
+					encryptedFilename, _ := simplecrypto.EncryptText(path.Base(filePath), keys.EncryptionKey)
+					encryptedPath = filepath.Dir(decToEncPaths[e]) + "/" + encryptedFilename
+					fmt.Println("using already existing encrypted path: " + encryptedPath)
+					break
+				} else {
+					remoteDirectoryFilename := path.Clean(remoteDirectory + "/" + path.Base(filePath))
+					encryptedPath = encryptFilePath(remoteDirectoryFilename, keys.EncryptionKey)
+				}
+			} else {
+				encryptedPath = encryptFilePath(filePath, keys.EncryptionKey)
+			}
+		}
+
+		for e := range decToEncPaths {
 			//stupid
 			plainTextRemotePath := decryptFilePath(encryptedPath, keys.EncryptionKey)
 			if e == plainTextRemotePath {
@@ -31,7 +46,7 @@ func doUpload(bs *bucketService, keys simplecrypto.Keys, filePath, remoteDirecto
 			}
 		}
 	} else {
-		fmt.Println(err)
+		return err
 	}
 
 	bs.uploadToBucket(encryptedFile, encryptedPath)

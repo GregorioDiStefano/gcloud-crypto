@@ -16,11 +16,11 @@ func doDeleteObject(bs *bucketService, keys simplecrypto.Keys, filepath string) 
 		return errors.New("failed getting objects: " + err.Error())
 	}
 
-	encToDecPaths := getEncryptedToDecryptedMap(objects, keys.EncryptionKey)
-	for k, _ := range encToDecPaths {
+	decToEncPaths := getDecryptedToEncryptedFileMapping(objects, keys.EncryptionKey)
+	for k, _ := range decToEncPaths {
 
 		if glob.Glob(filepath, k) && k != "keycheck" {
-			encryptedFilename := encToDecPaths[k]
+			encryptedFilename := decToEncPaths[k]
 			if encryptedFilename == "" {
 				return fmt.Errorf("file: %s not found in bucket", filepath)
 			}

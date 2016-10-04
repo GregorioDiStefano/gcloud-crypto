@@ -7,11 +7,10 @@ import (
 	"io/ioutil"
 	"log"
 	"os"
-	"path"
 	"syscall"
 
 	"github.com/GregorioDiStefano/gcloud-fuse/simplecrypto"
-	"github.com/ryanuber/go-glob"
+
 	"golang.org/x/crypto/ssh/terminal"
 	"golang.org/x/net/context"
 	"golang.org/x/oauth2/google"
@@ -43,6 +42,12 @@ func main() {
 		panic(err)
 	}
 
+	rl, err := setupReadline()
+
+	if err != nil {
+		panic(err)
+	}
+
 	cryptoKeys, _ := simplecrypto.GetKeyFromPassphrase(password, userData.salt)
 	client, err := google.DefaultClient(context.Background(), storage.DevstorageFullControlScope)
 
@@ -67,7 +72,7 @@ func main() {
 	}
 
 	if flag.Lookup("i").Value.String() == "true" {
-		interactiveMode(bs, *cryptoKeys)
+		interactiveMode(rl, bs, *cryptoKeys)
 	} else {
 		parseCmdLine(bs, *cryptoKeys)
 	}
@@ -102,56 +107,12 @@ func printList(bs *bucketService, key []byte) error {
 		return err
 	}
 
-	encToDecPaths := getEncryptedToDecryptedMap(objects, key)
+	decToEncPaths := getDecryptedToEncryptedFileMapping(objects, key)
 
 	count := 0
-	for i := range encToDecPaths {
+	for i := range decToEncPaths {
 		fmt.Println(count, ": ", i)
 		count++
-	}
-	return nil
-}
-
-func doDownload(bs *bucketService, keys simplecrypto.Keys, filename string) error {
-	objects, err := bs.getObjects()
-
-	if err != nil {
-		return errors.New("failed getting objects: " + err.Error())
-	}
-
-	encToDecPaths := getEncryptedToDecryptedMap(objects, keys.EncryptionKey)
-
-	foundFile := false
-	for k, _ := range encToDecPaths {
-		if glob.Glob(filename, k) {
-			foundFile = true
-
-			encryptedFilepath := encToDecPaths[k]
-			decryptedFilePath := decryptFilePath(encToDecPaths[k], keys.EncryptionKey)
-			downloadedEncryptedFile, err := bs.downloadFromBucket(encryptedFilepath)
-
-			if err != nil {
-				return err
-			}
-
-			defer os.Remove(downloadedEncryptedFile)
-
-			downloadedPlaintextFile, err := simplecrypto.DecryptFile(downloadedEncryptedFile, keys)
-			defer os.Remove(downloadedPlaintextFile)
-
-			if err != nil {
-				return err
-			}
-
-			_, tempDownloadFilename := path.Split(downloadedPlaintextFile)
-			_, actualFilename := path.Split(decryptedFilePath)
-
-			os.Rename(tempDownloadFilename, actualFilename)
-			fmt.Println("downloaded: " + actualFilename)
-		}
-	}
-	if !foundFile {
-		return errors.New("No files found")
 	}
 	return nil
 }

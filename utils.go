@@ -10,7 +10,7 @@ import (
 
 type decryptedToEncryptedFilePath map[string]string
 
-func getEncryptedToDecryptedMap(encryptedFilePaths []string, key []byte) decryptedToEncryptedFilePath {
+func getDecryptedToEncryptedFileMapping(encryptedFilePaths []string, key []byte) decryptedToEncryptedFilePath {
 	m := make(decryptedToEncryptedFilePath, len(encryptedFilePaths))
 	for _, e := range encryptedFilePaths {
 		plainTextFilepath := decryptFilePath(e, key)

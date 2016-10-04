@@ -9,13 +9,14 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
-	"github.com/stretchr/testify/assert"
 	"io"
 	"io/ioutil"
 	"os"
 	"os/exec"
 	"strings"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func randomByte(length int) []byte {
@@ -32,7 +33,7 @@ func TestEncryptDecryptText_Large_File(t *testing.T) {
 	t.Parallel()
 	key := randomByte(16)
 
-	plainText := strings.Repeat("this is a string 1234", 1024*1024*10)
+	plainText := strings.Repeat("this is a string 1234", 1024*1024*5)
 
 	et, err := EncryptText(plainText, key)
 
@@ -117,17 +118,18 @@ func TestEncryptDecryptFile(t *testing.T) {
 		{[]byte("foobar"), []byte("longtestiv123456"), "test_data/test-encrypt_decrypt_2", nil},
 		{[]byte("foobar"), []byte("longtestiv123456"), "test_data/test-encrypt_decrypt_3", nil},
 		{[]byte("foobar"), []byte("longtestiv123456"), "test_data/test-encrypt_decrypt_4", nil},
+		{[]byte("foobar"), []byte("longtestiv123456"), "test_data/404", errors.New(unableToOpenFileReading)},
 	}
 
 	for _, e := range encryptDecryptTests {
 		key, _ := GetKeyFromPassphrase(e.key, e.iv)
-		exec.Command("cp", e.filepath, tempFile).Run()
 
-		dataToEncrypt, _ := ioutil.ReadFile(tempFile)
-		encryptedFilename, err := EncryptFile(tempFile, *key)
+		dataToEncrypt, _ := ioutil.ReadFile(e.filepath)
+		encryptedFilename, err := EncryptFile(e.filepath, *key)
 
-		if err != nil {
-			panic(err)
+		if e.expectedError != nil {
+			assert.Equal(t, e.expectedError, err)
+			return
 		}
 
 		encryptedDataBytes, err := ioutil.ReadFile(encryptedFilename)
@@ -136,7 +138,7 @@ func TestEncryptDecryptFile(t *testing.T) {
 			panic(err)
 		}
 
-		assert.True(t, len(encryptedDataBytes) == len(dataToEncrypt)+aes.BlockSize+sha256.Size, "Looks like the IV is missing from the file?")
+		assert.True(t, len(encryptedDataBytes) == len(dataToEncrypt)+aes.BlockSize+sha256.Size, "Looks like the IV/HMAC is missing from the file?")
 
 		assert.NotEqual(t, encryptedDataBytes, dataToEncrypt)
 
@@ -170,6 +172,7 @@ func TestCalculateHMAC(t *testing.T) {
 		expectedError   error
 	}{
 		{[]byte("foobar"), []byte("longtestiv123456"), "test_data/test-calculate_hmac-1", "de48a455255028af130a99726a3a30144aec11cb80713cf67210d851af26774f", nil},
+		{[]byte("foobar"), []byte("longtestiv123456"), "test_data/test-calculate_hmac-2", "de48a455255028af130a99726a3a30144aec11cb80713cf67210d851af26774f", nil},
 	}
 
 	for _, h := range calculateHMACTests {
@@ -278,6 +281,7 @@ func TestTruncateHMACSignature(t *testing.T) {
 		expectedHMAC string
 	}{
 		{"test_data/test-truncate_hmac-1", nil, "9312d9e6a4dd7571481298141165206a4de52cca5c7c01ba3b7de0122e147d08"},
+		{"test_data/test-truncate_hmac-2", errors.New(errorReadingHMAC), ""},
 	}
 
 	for _, h := range truncateHMACTests {
@@ -290,12 +294,12 @@ func TestTruncateHMACSignature(t *testing.T) {
 
 		hmac, e := truncateHMACSignature(fh)
 
-		fmt.Println(hmac, e)
 		if h.expectedHMAC != "" {
 			assert.Equal(t, h.expectedHMAC, hex.EncodeToString(hmac))
 		}
 
 		if h.err != nil {
+			fmt.Println(h.err, e)
 			assert.Equal(t, h.err, e, "Unexpected error returned")
 		}
 	}

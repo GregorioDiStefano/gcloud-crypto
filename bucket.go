@@ -42,9 +42,7 @@ var progresses []Progress
 func (pt *PassThrough) Read(b []byte) (int, error) {
 	c, err := pt.Reader.Read(b)
 	pt.totalRead += int64(c)
-
-	fmt.Printf("%.2f complete.\r", 100*float64(pt.totalRead)/float64(pt.contentLength))
-
+	fmt.Println(fmt.Sprintf("%.2f complete.\r", 100*float64(pt.totalRead)/float64(pt.contentLength)))
 	return c, err
 }
 
