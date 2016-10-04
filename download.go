@@ -9,8 +9,14 @@ import (
 	"path"
 )
 
-func doDownload(bs *bucketService, keys simplecrypto.Keys, filename string) error {
+func doDownload(bs *bucketService, keys simplecrypto.Keys, filename, destinationDir string) error {
 	objects, err := bs.getObjects()
+
+	if len(destinationDir) > 0 {
+		if _, err := os.Stat(destinationDir); os.IsNotExist(err) {
+			return fmt.Errorf("destination directory: %s does not exist", destinationDir)
+		}
+	}
 
 	if err != nil {
 		return errors.New("failed getting objects: " + err.Error())

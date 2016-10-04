@@ -50,25 +50,38 @@ func interactiveMode(rl *readline.Instance, bs *bucketService, cryptoKeys simple
 
 		switch {
 		case strings.HasPrefix(line, "upload"):
-			workingDirectory := ""
+			destinationDirectory := ""
 			file := ""
+			fields := strings.Fields(line)
 
-			if len(strings.Fields(line)) == 3 {
-				workingDirectory = strings.Fields(line)[2]
-				file = strings.Fields(line)[1]
-			} else if len(strings.Fields(line)) > 3 {
-				fmt.Println("invalid upload request; try using 'upload <file>' or 'upload <file> <destination folder>' ")
+			if len(fields) == 3 {
+				destinationDirectory = fields[2]
+				file = fields[1]
+			} else if len(fields) > 3 || len(fields) <= 1 {
+				fmt.Println("invalid upload request; try using 'upload <file>' or 'upload <file> <destination folder>'")
+				break
 			}
 
-			returnedError = processUpload(bs, cryptoKeys, file, workingDirectory)
+			returnedError = processUpload(bs, cryptoKeys, file, destinationDirectory)
 		case strings.HasPrefix(line, "list") || strings.HasPrefix(line, "ls"):
 			returnedError = printList(bs, cryptoKeys.EncryptionKey)
 		case strings.HasPrefix(line, "delete"):
 			filepath := strings.TrimSpace(strings.TrimLeft(line, "delete"))
 			returnedError = doDeleteObject(bs, cryptoKeys, filepath)
 		case strings.HasPrefix(line, "download"):
-			filepath := strings.TrimSpace(strings.TrimLeft(line, "download"))
-			returnedError = doDownload(bs, cryptoKeys, filepath)
+			destinationDirectory := ""
+			filepath := ""
+			fields := strings.Fields(line)
+
+			if len(fields) == 3 {
+				destinationDirectory = fields[2]
+				filepath = fields[1]
+			} else if len(fields) > 3 || len(fields) <= 1 {
+				fmt.Println("invalid download request; try using 'download <file>' or 'download <file> <destination folder>'")
+				break
+			}
+
+			returnedError = doDownload(bs, cryptoKeys, filepath, destinationDirectory)
 		default:
 			fmt.Println("invalid command, try: 'upload', 'list', 'delete', 'download'")
 		}
@@ -88,7 +101,7 @@ func parseCmdLine(bs *bucketService, cryptoKeys simplecrypto.Keys) {
 		path := flag.Lookup("upload").Value.String()
 		returnedError = processUpload(bs, cryptoKeys, path, flag.Lookup("dir").Value.String())
 	case flag.Lookup("download").Value.String() != "":
-		returnedError = doDownload(bs, cryptoKeys, flag.Lookup("download").Value.String())
+		returnedError = doDownload(bs, cryptoKeys, flag.Lookup("download").Value.String(), flag.Lookup("dir").Value.String())
 	case flag.Lookup("list").Value.String() == "true":
 		printList(bs, cryptoKeys.EncryptionKey)
 	}
