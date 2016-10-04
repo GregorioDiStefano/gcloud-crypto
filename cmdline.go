@@ -32,7 +32,6 @@ func setupReadline() (*readline.Instance, error) {
 }
 
 func interactiveMode(rl *readline.Instance, bs *bucketService, cryptoKeys simplecrypto.Keys) {
-	var workingDirectory string
 	var returnedError error
 
 	for {
@@ -50,10 +49,17 @@ func interactiveMode(rl *readline.Instance, bs *bucketService, cryptoKeys simple
 		line = strings.TrimSpace(line)
 
 		switch {
-		case strings.HasPrefix(line, "cd"):
-			workingDirectory = strings.TrimSpace(strings.TrimLeft(line, "cd"))
 		case strings.HasPrefix(line, "upload"):
-			file := strings.TrimSpace(strings.TrimLeft(line, "upload"))
+			workingDirectory := ""
+			file := ""
+
+			if len(strings.Fields(line)) == 3 {
+				workingDirectory = strings.Fields(line)[2]
+				file = strings.Fields(line)[1]
+			} else if len(strings.Fields(line)) > 3 {
+				fmt.Println("invalid upload request; try using 'upload <file>' or 'upload <file> <destination folder>' ")
+			}
+
 			returnedError = processUpload(bs, cryptoKeys, file, workingDirectory)
 		case strings.HasPrefix(line, "list") || strings.HasPrefix(line, "ls"):
 			returnedError = printList(bs, cryptoKeys.EncryptionKey)
@@ -64,7 +70,7 @@ func interactiveMode(rl *readline.Instance, bs *bucketService, cryptoKeys simple
 			filepath := strings.TrimSpace(strings.TrimLeft(line, "download"))
 			returnedError = doDownload(bs, cryptoKeys, filepath)
 		default:
-			fmt.Println("invalid command, try: 'cd', 'upload', 'list', 'delete'")
+			fmt.Println("invalid command, try: 'upload', 'list', 'delete', 'download'")
 		}
 		if returnedError != nil {
 			fmt.Println(returnedError)
