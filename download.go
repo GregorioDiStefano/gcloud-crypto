@@ -7,6 +7,7 @@ import (
 	"github.com/ryanuber/go-glob"
 	"os"
 	"path"
+	"path/filepath"
 )
 
 func doDownload(bs *bucketService, keys simplecrypto.Keys, filename, destinationDir string) error {
@@ -49,7 +50,9 @@ func doDownload(bs *bucketService, keys simplecrypto.Keys, filename, destination
 			_, tempDownloadFilename := path.Split(downloadedPlaintextFile)
 			_, actualFilename := path.Split(decryptedFilePath)
 
-			os.Rename(tempDownloadFilename, actualFilename)
+			os.MkdirAll(destinationDir+"/"+filepath.Dir(k), 0777)
+			fmt.Println("create dir: ", destinationDir+"/"+filepath.Dir(k))
+			os.Rename(tempDownloadFilename, destinationDir+"/"+filepath.Dir(k)+"/"+actualFilename)
 			fmt.Println("downloaded: " + actualFilename)
 		}
 	}

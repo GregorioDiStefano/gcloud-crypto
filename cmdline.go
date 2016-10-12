@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"flag"
 	"fmt"
 	"io"
@@ -9,14 +10,21 @@ import (
 
 	"github.com/GregorioDiStefano/gcloud-fuse/simplecrypto"
 	"github.com/chzyer/readline"
+	"github.com/mattn/go-shellwords"
+)
+
+const (
+	invalidFormat   = "invalid command line"
+	invalidUpload   = "invalid upload request; try using 'upload <file>' or 'upload <file> <destination directroy>'"
+	invalidDownload = "invalid download request; try using 'download <file>' or 'download <file> <destination folder>'"
 )
 
 var completer = readline.NewPrefixCompleter(
-	readline.PcItem("cd"),
 	readline.PcItem("upload"),
 	readline.PcItem("download"),
 	readline.PcItem("delete"),
 	readline.PcItem("list"),
+	readline.PcItem("exit"),
 )
 
 func setupReadline() (*readline.Instance, error) {
@@ -29,6 +37,25 @@ func setupReadline() (*readline.Instance, error) {
 	})
 
 	return l, err
+}
+
+// getSrcDestString seperates a line to src and dst path
+func getSrcDestString(line string) (src, dst string, err error) {
+	parsedLine, _ := shellwords.Parse(line)
+
+	srcFile := ""
+	destinationDirectory := ""
+
+	if len(parsedLine) == 1 {
+		srcFile = parsedLine[0]
+	} else if len(parsedLine) == 2 {
+		srcFile = parsedLine[0]
+		destinationDirectory = parsedLine[1]
+	} else {
+		return "", "", errors.New(invalidFormat)
+	}
+
+	return srcFile, destinationDirectory, nil
 }
 
 func interactiveMode(rl *readline.Instance, bs *bucketService, cryptoKeys simplecrypto.Keys) {
@@ -50,40 +77,30 @@ func interactiveMode(rl *readline.Instance, bs *bucketService, cryptoKeys simple
 
 		switch {
 		case strings.HasPrefix(line, "upload"):
-			destinationDirectory := ""
-			file := ""
-			fields := strings.Fields(line)
-
-			if len(fields) == 3 {
-				destinationDirectory = fields[2]
-				file = fields[1]
-			} else if len(fields) > 3 || len(fields) <= 1 {
-				fmt.Println("invalid upload request; try using 'upload <file>' or 'upload <file> <destination folder>'")
-				break
+			cleanLine := (strings.TrimSpace(strings.TrimLeft(line, "upload")))
+			if srcFile, destinationDirectory, err := getSrcDestString(cleanLine); err != nil {
+				returnedError = errors.New(invalidUpload)
+			} else {
+				returnedError = processUpload(bs, cryptoKeys, srcFile, destinationDirectory)
 			}
-
-			returnedError = processUpload(bs, cryptoKeys, file, destinationDirectory)
 		case strings.HasPrefix(line, "list") || strings.HasPrefix(line, "ls"):
-			returnedError = printList(bs, cryptoKeys.EncryptionKey)
+			if fileList, returnedError := getFileList(bs, cryptoKeys.EncryptionKey); returnedError == nil {
+				enumeratePrint(fileList)
+			}
 		case strings.HasPrefix(line, "delete"):
 			filepath := strings.TrimSpace(strings.TrimLeft(line, "delete"))
 			returnedError = doDeleteObject(bs, cryptoKeys, filepath)
 		case strings.HasPrefix(line, "download"):
-			destinationDirectory := ""
-			filepath := ""
-			fields := strings.Fields(line)
-
-			if len(fields) == 3 {
-				destinationDirectory = fields[2]
-				filepath = fields[1]
-			} else if len(fields) > 3 || len(fields) <= 1 {
-				fmt.Println("invalid download request; try using 'download <file>' or 'download <file> <destination folder>'")
-				break
+			cleanLine := (strings.TrimSpace(strings.TrimLeft(line, "download")))
+			if srcFile, destinationDirectory, err := getSrcDestString(cleanLine); err != nil {
+				returnedError = errors.New(invalidDownload)
+			} else {
+				returnedError = doDownload(bs, cryptoKeys, srcFile, destinationDirectory)
 			}
-
-			returnedError = doDownload(bs, cryptoKeys, filepath, destinationDirectory)
+		case strings.HasPrefix(line, "exit"):
+			return
 		default:
-			fmt.Println("invalid command, try: 'upload', 'list', 'delete', 'download'")
+			fmt.Println("invalid command, try: 'upload', 'list', 'delete', 'download', 'exit'")
 		}
 		if returnedError != nil {
 			fmt.Println(returnedError)
@@ -103,7 +120,9 @@ func parseCmdLine(bs *bucketService, cryptoKeys simplecrypto.Keys) {
 	case flag.Lookup("download").Value.String() != "":
 		returnedError = doDownload(bs, cryptoKeys, flag.Lookup("download").Value.String(), flag.Lookup("dir").Value.String())
 	case flag.Lookup("list").Value.String() == "true":
-		printList(bs, cryptoKeys.EncryptionKey)
+		if fileList, returnedError := getFileList(bs, cryptoKeys.EncryptionKey); returnedError == nil {
+			enumeratePrint(fileList)
+		}
 	}
 
 	if returnedError != nil {

@@ -7,6 +7,7 @@ import (
 	"io/ioutil"
 	"log"
 	"os"
+	"sort"
 	"syscall"
 
 	"github.com/GregorioDiStefano/gcloud-fuse/simplecrypto"
@@ -101,18 +102,19 @@ func verifyPassword(bs *bucketService, cryptoKeys simplecrypto.Keys) error {
 	return nil
 }
 
-func printList(bs *bucketService, key []byte) error {
+func getFileList(bs *bucketService, key []byte) ([]string, error) {
 	objects, err := bs.getObjects()
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	decToEncPaths := getDecryptedToEncryptedFileMapping(objects, key)
 
-	count := 0
-	for i := range decToEncPaths {
-		fmt.Println(count, ": ", i)
-		count++
+	var keys []string
+	for k := range decToEncPaths {
+		keys = append(keys, k)
 	}
-	return nil
+	sort.Strings(keys)
+
+	return keys, nil
 }

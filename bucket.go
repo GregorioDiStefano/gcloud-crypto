@@ -60,6 +60,7 @@ func (bs bucketService) deleteObject(encryptedFilePath string) error {
 
 func (bs bucketService) uploadToBucket(fileToUpload, encryptedUploadPath string) error {
 	var fileSize int64
+
 	object := &storage.Object{Name: encryptedUploadPath}
 
 	file, err := os.Open(fileToUpload)
@@ -143,6 +144,5 @@ func (bs bucketService) getObjects() ([]string, error) {
 			break
 		}
 	}
-
 	return objects, nil
 }

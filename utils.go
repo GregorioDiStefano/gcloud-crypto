@@ -2,10 +2,9 @@ package main
 
 import (
 	"fmt"
+	"github.com/GregorioDiStefano/gcloud-fuse/simplecrypto"
 	"os"
 	"strings"
-
-	"github.com/GregorioDiStefano/gcloud-fuse/simplecrypto"
 )
 
 type decryptedToEncryptedFilePath map[string]string
@@ -47,6 +46,14 @@ func decryptFilePath(encryptedPath string, key []byte) string {
 
 	entireDecryptedPath := strings.Join(decryptedPath, "/")
 	return entireDecryptedPath
+}
+
+func enumeratePrint(items []string) {
+	count := 0
+	for _, e := range items {
+		fmt.Println(fmt.Sprintf("%d:\t%s", count, e))
+		count++
+	}
 }
 
 func isDir(filepath string) bool {
