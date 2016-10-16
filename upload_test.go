@@ -3,12 +3,6 @@ package main
 import (
 	"context"
 	"errors"
-	_ "fmt"
-	"github.com/GregorioDiStefano/gcloud-fuse/simplecrypto"
-	_ "github.com/ryanuber/go-glob"
-	"github.com/stretchr/testify/assert"
-	"golang.org/x/oauth2/google"
-	"google.golang.org/api/storage/v1"
 	"io/ioutil"
 	"log"
 	"os"
@@ -17,6 +11,12 @@ import (
 	_ "strings"
 	"testing"
 	"time"
+
+	"github.com/GregorioDiStefano/gcloud-fuse/simplecrypto"
+	_ "github.com/ryanuber/go-glob"
+	"github.com/stretchr/testify/assert"
+	"golang.org/x/oauth2/google"
+	"google.golang.org/api/storage/v1"
 )
 
 func setupUp() (*bucketService, simplecrypto.Keys) {
@@ -36,7 +36,7 @@ func setupUp() (*bucketService, simplecrypto.Keys) {
 	userData.configFile.Set("project_id", "stuff-141918")
 
 	bs := NewBucketService(*service, "go-testing", "stuff-141918")
-	keys, err := simplecrypto.GetKeyFromPassphrase([]byte("testing"), []byte("salt1234"))
+	keys, err := simplecrypto.GetKeyFromPassphrase([]byte("testing"), []byte("salt1234"), 4096, 16, 1)
 
 	if err != nil {
 		panic(err)
@@ -89,7 +89,7 @@ func TestDoUpload(t *testing.T) {
 		err := processUpload(bs, keys, path, remoteDirectory)
 		assert.Equal(t, err, e.expectedError)
 
-		time.Sleep(20 * time.Second)
+		time.Sleep(10 * time.Second)
 
 		if e.expectedError == nil {
 			filesInBucket, _ := getFileList(bs, keys.EncryptionKey)

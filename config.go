@@ -32,14 +32,14 @@ func parseConfig() *userData {
 	viper.AddConfigPath(".")
 
 	if err := viper.ReadInConfig(); err != nil {
-		panic(fmt.Errorf("Fatal error config file: %s \n", err))
+		panic(fmt.Sprintf("Fatal error config file: %s \n", err))
 	}
 
 	switch {
 	case viper.GetString("bucket") == "":
-		panic("bucket not set in config file.")
+		panic("'bucket' not set in config file.")
 	case viper.GetString("project_id") == "":
-		panic("project_id not set in config file.")
+		panic("'project_id' not set in config file.")
 	}
 
 	// be default, use the SHA256 of the project_id as the salt

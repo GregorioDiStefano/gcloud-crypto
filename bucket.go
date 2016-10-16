@@ -42,7 +42,7 @@ var progresses []Progress
 func (pt *PassThrough) Read(b []byte) (int, error) {
 	c, err := pt.Reader.Read(b)
 	pt.totalRead += int64(c)
-	fmt.Println(fmt.Sprintf("%.2f complete.\r", 100*float64(pt.totalRead)/float64(pt.contentLength)))
+	fmt.Printf("%.2f complete.\r", 100*float64(pt.totalRead)/float64(pt.contentLength))
 	return c, err
 }
 
@@ -102,7 +102,7 @@ func (bs bucketService) downloadFromBucket(encryptedFilePath string) (string, er
 	download, err := obj.Download()
 
 	if err != nil {
-		return "", errors.New("Error trying to download file:" + err.Error())
+		return saveFilename, errors.New("Error trying to download file:" + err.Error())
 	}
 
 	defer download.Body.Close()
@@ -116,7 +116,7 @@ func (bs bucketService) downloadFromBucket(encryptedFilePath string) (string, er
 	if written, err := io.Copy(writeFile, pt); err != nil {
 		fmt.Println(err)
 	} else if written != download.ContentLength {
-		return "", errors.New("Download failed, file was not entirely downloaded")
+		return saveFilename, errors.New("Download failed, file was not entirely downloaded")
 	}
 
 	writeFile.Close()

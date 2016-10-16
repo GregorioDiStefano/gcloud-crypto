@@ -47,7 +47,7 @@ func generateRandomIV() []byte {
 	return randomBytes(aes.BlockSize)
 }
 
-func GetKeyFromPassphrase(passphrase, salt []byte) (*Keys, error) {
+func GetKeyFromPassphrase(passphrase, salt []byte, N, r, p int) (*Keys, error) {
 	if passphrase == nil || salt == nil {
 		return nil, errors.New(noSaltOrPassword)
 	}
@@ -56,7 +56,7 @@ func GetKeyFromPassphrase(passphrase, salt []byte) (*Keys, error) {
 		return nil, errors.New(saltTooSmall)
 	}
 
-	k, err := scrypt.Key([]byte(passphrase), salt, 4096, 16, 1, 64)
+	k, err := scrypt.Key([]byte(passphrase), salt, N, r, p, 64)
 
 	if err != nil {
 		return nil, err

@@ -5,9 +5,7 @@ import (
 	"flag"
 	"fmt"
 	"io/ioutil"
-	"log"
 	"os"
-	"sort"
 	"syscall"
 
 	"github.com/GregorioDiStefano/gcloud-fuse/simplecrypto"
@@ -27,6 +25,11 @@ func init() {
 
 	flag.String("dir", "", "directory to store uploaded file to")
 }
+
+const (
+	PASSWORD_CHECK_STRING = "keyCheck"
+	PASSWORD_CHECK_FILE   = "keycheck"
+)
 
 func main() {
 	flag.Parse()
@@ -49,20 +52,22 @@ func main() {
 		panic(err)
 	}
 
-	cryptoKeys, _ := simplecrypto.GetKeyFromPassphrase(password, userData.salt)
+	cryptoKeys, err := simplecrypto.GetKeyFromPassphrase(password, userData.salt, 8192, 16, 128)
+
+	if err != nil {
+		panic(err)
+	}
+
 	client, err := google.DefaultClient(context.Background(), storage.DevstorageFullControlScope)
 
 	if err != nil {
-		log.Fatalf("Unable to get default client: %v", err)
+		panic(fmt.Sprintf("Unable to get default client: %v", err))
 	}
 
 	service, err := storage.New(client)
 
 	if err != nil {
-		log.Fatalf("Unable to create storage service: %v", err)
-	}
-
-	if _, err := service.Buckets.Get(userData.configFile.GetString("bucket")).Do(); err == nil {
+		panic(fmt.Sprintf("Unable to create storage service: %v", err))
 	}
 
 	bs := NewBucketService(*service, userData.configFile.GetString("bucket"), userData.configFile.GetString("project_id"))
@@ -81,40 +86,23 @@ func main() {
 }
 
 func verifyPassword(bs *bucketService, cryptoKeys simplecrypto.Keys) error {
-	const testString = "keyCheck"
+	const testString = PASSWORD_CHECK_STRING
 	testdata, err := simplecrypto.EncryptText(testString, cryptoKeys.EncryptionKey)
 
 	if err != nil {
 		return errors.New("unable to encrypt test string: " + err.Error())
 	}
 
-	testfile, err := bs.downloadFromBucket("keycheck")
+	testfile, err := bs.downloadFromBucket(PASSWORD_CHECK_FILE)
 	defer os.Remove(testfile)
 
 	if err != nil {
-		return errors.New(fmt.Sprintf("failed to find a \"keycheck\" file, if this is a new bucket, create a file called, \"keycheck\" containing: %s", testdata))
+		return errors.New(fmt.Sprintf("failed to find a '%s' file, if this is a new bucket, create a file called '%s' containing: %s", PASSWORD_CHECK_FILE, PASSWORD_CHECK_FILE, testdata))
 	} else {
 		testfileBytes, _ := ioutil.ReadFile(testfile)
 		if plainText, err := simplecrypto.DecryptText(string(testfileBytes), cryptoKeys.EncryptionKey); err != nil || plainText != testString {
-			return errors.New("failed to verify bucket is using specified password: " + err.Error())
+			return errors.New("failed to verify password: " + err.Error())
 		}
 	}
 	return nil
-}
-
-func getFileList(bs *bucketService, key []byte) ([]string, error) {
-	objects, err := bs.getObjects()
-	if err != nil {
-		return nil, err
-	}
-
-	decToEncPaths := getDecryptedToEncryptedFileMapping(objects, key)
-
-	var keys []string
-	for k := range decToEncPaths {
-		keys = append(keys, k)
-	}
-	sort.Strings(keys)
-
-	return keys, nil
 }

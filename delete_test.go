@@ -2,9 +2,10 @@ package main
 
 import (
 	"fmt"
-	"github.com/stretchr/testify/assert"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestDoDeleteObject(t *testing.T) {
@@ -29,7 +30,8 @@ func TestDoDeleteObject(t *testing.T) {
 			fmt.Println(getFileList(bs, keys.EncryptionKey))
 			doDeleteObject(bs, keys, e.destinationDirectory+"/"+e.uploadFilepath)
 			time.Sleep(30 * time.Second)
-			_, err := getFileList(bs, keys.EncryptionKey)
+			fileList, err := getFileList(bs, keys.EncryptionKey)
+			assert.Empty(t, fileList)
 			assert.Empty(t, err)
 		} else if err != nil {
 			panic("failed to upload")

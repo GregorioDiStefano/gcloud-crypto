@@ -122,7 +122,7 @@ func TestEncryptDecryptFile(t *testing.T) {
 	}
 
 	for _, e := range encryptDecryptTests {
-		key, _ := GetKeyFromPassphrase(e.key, e.iv)
+		key, _ := GetKeyFromPassphrase(e.key, e.iv, 4096, 16, 1)
 
 		dataToEncrypt, _ := ioutil.ReadFile(e.filepath)
 		encryptedFilename, err := EncryptFile(e.filepath, *key)
@@ -191,7 +191,7 @@ func TestCalculateHMAC(t *testing.T) {
 
 func TestGetKeyFromPassphrase(t *testing.T) {
 	t.Parallel()
-	key, _ := GetKeyFromPassphrase([]byte("password"), []byte("salt1234"))
+	key, _ := GetKeyFromPassphrase([]byte("password"), []byte("salt1234"), 4096, 16, 1)
 	keyAsByte, _ := hex.DecodeString("881532abb8344b9f6720bf8cba43ec1c5ccd717bf5ca9b1461fb8afeb832aa6473c7d97ef9f6c203cd15763884b75b958347bffbe28bbee351c09818a23c4632")
 	actualKey := &Keys{keyAsByte[:32], keyAsByte[32:64]}
 	assert.Equal(t, key, actualKey)
@@ -200,14 +200,14 @@ func TestGetKeyFromPassphrase(t *testing.T) {
 func TestGetKeyFromPassphraseError_1(t *testing.T) {
 	t.Parallel()
 
-	_, err := GetKeyFromPassphrase([]byte(""), []byte("abc"))
+	_, err := GetKeyFromPassphrase([]byte(""), []byte("abc"), 4096, 16, 1)
 	assert.Error(t, err, "No error returned")
 }
 
 func TestGetKeyFromPassphraseError_2(t *testing.T) {
 	t.Parallel()
 
-	_, err := GetKeyFromPassphrase(nil, []byte("abcd1234"))
+	_, err := GetKeyFromPassphrase(nil, []byte("abcd1234"), 4096, 16, 1)
 	assert.Error(t, err, "No error returned")
 }
 

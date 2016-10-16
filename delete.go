@@ -19,7 +19,7 @@ func doDeleteObject(bs *bucketService, keys simplecrypto.Keys, filepath string) 
 	decToEncPaths := getDecryptedToEncryptedFileMapping(objects, keys.EncryptionKey)
 	for k, _ := range decToEncPaths {
 
-		if glob.Glob(filepath, k) && k != "keycheck" {
+		if glob.Glob(filepath, k) && k != PASSWORD_CHECK_FILE {
 			encryptedFilename := decToEncPaths[k]
 			if encryptedFilename == "" {
 				return fmt.Errorf("file: %s not found in bucket", filepath)

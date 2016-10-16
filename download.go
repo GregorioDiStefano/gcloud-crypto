@@ -3,11 +3,12 @@ package main
 import (
 	"errors"
 	"fmt"
-	"github.com/GregorioDiStefano/gcloud-fuse/simplecrypto"
-	"github.com/ryanuber/go-glob"
 	"os"
 	"path"
 	"path/filepath"
+
+	"github.com/GregorioDiStefano/gcloud-fuse/simplecrypto"
+	"github.com/ryanuber/go-glob"
 )
 
 func doDownload(bs *bucketService, keys simplecrypto.Keys, filename, destinationDir string) error {
@@ -31,7 +32,7 @@ func doDownload(bs *bucketService, keys simplecrypto.Keys, filename, destination
 			foundFile = true
 
 			encryptedFilepath := decToEncPaths[k]
-			decryptedFilePath := decryptFilePath(decToEncPaths[k], keys.EncryptionKey)
+			decryptedFilePath, _ := decryptFilePath(decToEncPaths[k], keys.EncryptionKey)
 			downloadedEncryptedFile, err := bs.downloadFromBucket(encryptedFilepath)
 
 			if err != nil {

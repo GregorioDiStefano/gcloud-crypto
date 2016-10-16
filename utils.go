@@ -1,10 +1,12 @@
 package main
 
 import (
+	"errors"
 	"fmt"
-	"github.com/GregorioDiStefano/gcloud-fuse/simplecrypto"
 	"os"
 	"strings"
+
+	"github.com/GregorioDiStefano/gcloud-fuse/simplecrypto"
 )
 
 type decryptedToEncryptedFilePath map[string]string
@@ -12,7 +14,12 @@ type decryptedToEncryptedFilePath map[string]string
 func getDecryptedToEncryptedFileMapping(encryptedFilePaths []string, key []byte) decryptedToEncryptedFilePath {
 	m := make(decryptedToEncryptedFilePath, len(encryptedFilePaths))
 	for _, e := range encryptedFilePaths {
-		plainTextFilepath := decryptFilePath(e, key)
+		plainTextFilepath, err := decryptFilePath(e, key)
+
+		if err != nil {
+			fmt.Println(err)
+		}
+
 		m[plainTextFilepath] = e
 	}
 
@@ -32,27 +39,31 @@ func encryptFilePath(path string, key []byte) string {
 	return entireEncryptedPath
 }
 
-func decryptFilePath(encryptedPath string, key []byte) string {
+func decryptFilePath(encryptedPath string, key []byte) (string, error) {
 	splitPath := strings.Split(encryptedPath, "/")
-	var decryptedPath []string
+	decryptedPath := []string{}
 
 	for _, e := range splitPath {
 		if t, err := simplecrypto.DecryptText(e, key); err == nil {
 			decryptedPath = append(decryptedPath, t)
 		} else {
-			decryptedPath = []string{fmt.Sprintf("(error decrypting filepath) %s", encryptedPath)}
+			return "", errors.New("failed to decrypt file: " + encryptedPath)
 		}
 	}
 
 	entireDecryptedPath := strings.Join(decryptedPath, "/")
-	return entireDecryptedPath
+	return entireDecryptedPath, nil
 }
 
 func enumeratePrint(items []string) {
-	count := 0
-	for _, e := range items {
-		fmt.Println(fmt.Sprintf("%d:\t%s", count, e))
-		count++
+	if len(items) > 0 {
+		count := 0
+		for _, e := range items {
+			if e != "" {
+				fmt.Println(fmt.Sprintf("%d:\t%s", count, e))
+				count++
+			}
+		}
 	}
 }
 
@@ -62,3 +73,30 @@ func isDir(filepath string) bool {
 	}
 	return false
 }
+
+/*
+func findCommonPath(path1, path2 string) string {
+	path1 = filepath.Clean(path1)
+	path2 = filepath.Clean(path2)
+
+	splitPath1 := strings.Split(path1, "/")
+	splitPath2 := strings.Split(path2, "/")
+	commonPath := ""
+
+	for i, e := range splitPath1 {
+		if splitPath2[i] == e {
+			if len(e) > 0 {
+				commonPath += e + "/"
+			}
+
+		} else {
+			break
+		}
+	}
+	commonPath = filepath.Clean(commonPath)
+	if commonPath == "." {
+		return ""
+	}
+	return filepath.Clean(commonPath) + "/"
+}
+*/
