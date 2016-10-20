@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"errors"
+	"fmt"
 	"io/ioutil"
 	"log"
 	"os"
@@ -18,6 +19,8 @@ import (
 	"golang.org/x/oauth2/google"
 	"google.golang.org/api/storage/v1"
 )
+
+var randomFileTestFilename string
 
 func setupUp() (*bucketService, simplecrypto.Keys) {
 	client, err := google.DefaultClient(context.Background(), storage.DevstorageFullControlScope)
@@ -42,6 +45,8 @@ func setupUp() (*bucketService, simplecrypto.Keys) {
 		panic(err)
 	}
 
+	randomFileTestFilename = randomFile()
+
 	return bs, *keys
 }
 
@@ -50,6 +55,13 @@ func tearDown(bs *bucketService) {
 	for _, e := range objs {
 		bs.deleteObject(e)
 	}
+	os.Remove(randomFileTestFilename)
+}
+
+func randomFile() string {
+	tmpfile, _ := ioutil.TempFile(".", "test")
+	tmpfile.Write([]byte("this is a test string"))
+	return tmpfile.Name()
 }
 
 func TestDoUpload(t *testing.T) {
@@ -71,6 +83,10 @@ func TestDoUpload(t *testing.T) {
 			"test1/testdata/nested_1/nested_nested_1/testdata1",
 			"test1/testdata/nested_1/testdata1",
 			"test1/testdata/nested_2/testdata2",
+			"test1/testdata/nested_3/testdata1",
+			"test1/testdata/nested_3/testdata2",
+			"test1/testdata/test_a/a",
+			"test1/testdata/test_b/b",
 			"test1/testdata/testdata1",
 			"test1/testdata/testdata2",
 			"test1/testdata/testdata3",
@@ -80,6 +96,10 @@ func TestDoUpload(t *testing.T) {
 		{"testdata/testdata1", "test2", false, "file", nil, []string{"test2/testdata/testdata1"}},
 		{"testdata/testdata1", "test2", true, "file", errors.New(fileUploadFailError), nil},
 		{"testdata/file_that_doesnt_exist", "test3", true, "file", errors.New(fileNotFoundError), nil},
+		{"testdata/nested_3/", "test3", true, "dir", nil, []string{"test3/testdata/nested_3/testdata1", "test3/testdata/nested_3/testdata2"}},
+		{"testdata/nested_3/*1*", "test4", true, "", nil, []string{"test4/testdata/nested_3/testdata1"}},
+		{"testdata/test_*", "test5", true, "", nil, []string{"test5/testdata/test_a/a", "test5/testdata/test_b/b"}},
+		{randomFileTestFilename, "", false, "", nil, []string{randomFileTestFilename}},
 	}
 
 	for _, e := range uploadTests {
@@ -89,18 +109,19 @@ func TestDoUpload(t *testing.T) {
 		err := processUpload(bs, keys, path, remoteDirectory)
 		assert.Equal(t, err, e.expectedError)
 
-		time.Sleep(10 * time.Second)
+		time.Sleep(20 * time.Second)
 
 		if e.expectedError == nil {
-			filesInBucket, _ := getFileList(bs, keys.EncryptionKey)
+			filesInBucket, err := getFileList(bs, keys.EncryptionKey, "")
+			assert.Nil(t, err)
 			assert.Equal(t, filesInBucket, e.expectedStructure)
 		}
 
 		if e.expectedStructure != nil {
 			cwd, _ := os.Getwd()
 			tempDir, _ := ioutil.TempDir(cwd, "testrun")
-			doDownload(bs, keys, e.destinationDirectory+"/*", tempDir)
-
+			err := doDownload(bs, keys, "*", tempDir)
+			assert.Nil(t, err)
 			switch e.srcType {
 			case "file":
 				out, err := exec.Command("diff", "-r", "-q", e.uploadFilepath, tempDir+"/"+e.destinationDirectory+"/"+filepath.Dir(e.uploadFilepath)).Output()
@@ -108,10 +129,12 @@ func TestDoUpload(t *testing.T) {
 				assert.Nil(t, err)
 			case "dir":
 				out, err := exec.Command("diff", "-r", "-q", filepath.Dir(e.uploadFilepath), tempDir+"/"+e.destinationDirectory+"/"+filepath.Dir(e.uploadFilepath)).Output()
+				fmt.Println(t, string(out))
 				assert.Empty(t, out)
 				assert.Nil(t, err)
-			}
+			case "glob":
 
+			}
 			os.RemoveAll(tempDir)
 		}
 

@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"testing"
 	"time"
 
@@ -27,10 +26,9 @@ func TestDoDeleteObject(t *testing.T) {
 
 	for _, e := range uploadTests {
 		if err := processUpload(bs, keys, e.uploadFilepath, e.destinationDirectory); err == nil {
-			fmt.Println(getFileList(bs, keys.EncryptionKey))
 			doDeleteObject(bs, keys, e.destinationDirectory+"/"+e.uploadFilepath)
-			time.Sleep(30 * time.Second)
-			fileList, err := getFileList(bs, keys.EncryptionKey)
+			time.Sleep(15 * time.Second)
+			fileList, err := getFileList(bs, keys.EncryptionKey, "")
 			assert.Empty(t, fileList)
 			assert.Empty(t, err)
 		} else if err != nil {

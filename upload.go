@@ -66,13 +66,10 @@ func doUpload(bs *bucketService, keys simplecrypto.Keys, uploadFile, remoteDirec
 
 	if remoteDirectory == "" && filepath.Dir(uploadFile) == "." {
 		encryptedPath = encryptFilePath(uploadFile, keys.EncryptionKey)
-
-		bs.uploadToBucket(encryptedFile, encryptedPath)
 	} else {
-
 		finalRemoteUploadPath := filepath.Clean(remoteDirectory + "/" + filepath.Dir(uploadFile) + "/" + filepath.Base(uploadFile))
 		finalRemoteUploadDirectoryPath := filepath.Dir(finalRemoteUploadPath)
-
+		fmt.Println("upload directory: ", finalRemoteUploadDirectoryPath, "final upload path: ", finalRemoteUploadPath)
 		if matchingDirectory := findExistingPath(*bs, keys, finalRemoteUploadDirectoryPath); matchingDirectory != "" {
 			encryptedFilename, _ := simplecrypto.EncryptText(path.Base(uploadFile), keys.EncryptionKey)
 			encryptedPath = filepath.Dir(matchingDirectory) + "/" + encryptedFilename

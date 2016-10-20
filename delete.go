@@ -4,8 +4,6 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/ryanuber/go-glob"
-
 	"github.com/GregorioDiStefano/gcloud-fuse/simplecrypto"
 )
 
@@ -17,10 +15,9 @@ func doDeleteObject(bs *bucketService, keys simplecrypto.Keys, filepath string) 
 	}
 
 	decToEncPaths := getDecryptedToEncryptedFileMapping(objects, keys.EncryptionKey)
-	for k, _ := range decToEncPaths {
-
-		if glob.Glob(filepath, k) && k != PASSWORD_CHECK_FILE {
-			encryptedFilename := decToEncPaths[k]
+	for plaintextFilename, _ := range decToEncPaths {
+		if filepath == plaintextFilename && plaintextFilename != PASSWORD_CHECK_FILE {
+			encryptedFilename := decToEncPaths[plaintextFilename]
 			if encryptedFilename == "" {
 				return fmt.Errorf("file: %s not found in bucket", filepath)
 			}
@@ -28,7 +25,7 @@ func doDeleteObject(bs *bucketService, keys simplecrypto.Keys, filepath string) 
 			if err := bs.deleteObject(encryptedFilename); err != nil {
 				return err
 			} else {
-				fmt.Println("deleted: " + k)
+				fmt.Println("deleted: " + plaintextFilename)
 			}
 		}
 	}

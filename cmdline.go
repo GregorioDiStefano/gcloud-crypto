@@ -21,6 +21,7 @@ const (
 
 var completer = readline.NewPrefixCompleter(
 	readline.PcItem("upload"),
+	readline.PcItem("dirs"),
 	readline.PcItem("download"),
 	readline.PcItem("delete"),
 	readline.PcItem("list"),
@@ -77,21 +78,30 @@ func interactiveMode(rl *readline.Instance, bs *bucketService, cryptoKeys simple
 
 		switch {
 		case strings.HasPrefix(line, "upload"):
-			cleanLine := (strings.TrimSpace(strings.TrimLeft(line, "upload")))
+			cleanLine := strings.TrimSpace(strings.TrimLeft(line, "upload"))
 			if srcFile, destinationDirectory, err := getSrcDestString(cleanLine); err != nil {
 				returnedError = errors.New(invalidUpload)
 			} else {
 				returnedError = processUpload(bs, cryptoKeys, srcFile, destinationDirectory)
 			}
-		case strings.HasPrefix(line, "list") || strings.HasPrefix(line, "ls"):
-			if fileList, returnedError := getFileList(bs, cryptoKeys.EncryptionKey); returnedError == nil {
+		case strings.HasPrefix(line, "ls"):
+			var fileList []string
+			matchGlob := strings.TrimSpace(strings.TrimLeft(line, "ls"))
+			if fileList, returnedError = getFileList(bs, cryptoKeys.EncryptionKey, matchGlob); returnedError == nil {
 				enumeratePrint(fileList)
+			}
+		case strings.HasPrefix(line, "dirs"):
+			var dirList []string
+			matchGlob := strings.TrimSpace(strings.TrimLeft(line, "dirs"))
+			if dirList, returnedError = getDirList(bs, cryptoKeys.EncryptionKey, matchGlob); returnedError == nil {
+				enumeratePrint(dirList)
 			}
 		case strings.HasPrefix(line, "delete"):
 			filepath := strings.TrimSpace(strings.TrimLeft(line, "delete"))
 			returnedError = doDeleteObject(bs, cryptoKeys, filepath)
+
 		case strings.HasPrefix(line, "download"):
-			cleanLine := (strings.TrimSpace(strings.TrimLeft(line, "download")))
+			cleanLine := strings.TrimSpace(strings.TrimLeft(line, "download"))
 			if srcFile, destinationDirectory, err := getSrcDestString(cleanLine); err != nil {
 				returnedError = errors.New(invalidDownload)
 			} else {
@@ -103,7 +113,8 @@ func interactiveMode(rl *readline.Instance, bs *bucketService, cryptoKeys simple
 			fmt.Println("invalid command, try: 'upload', 'list', 'delete', 'download', 'exit'")
 		}
 		if returnedError != nil {
-			fmt.Println(returnedError)
+			fmt.Println("Error: ", returnedError)
+			returnedError = nil
 		}
 	}
 }
@@ -120,7 +131,8 @@ func parseCmdLine(bs *bucketService, cryptoKeys simplecrypto.Keys) {
 	case flag.Lookup("download").Value.String() != "":
 		returnedError = doDownload(bs, cryptoKeys, flag.Lookup("download").Value.String(), flag.Lookup("dir").Value.String())
 	case flag.Lookup("list").Value.String() == "true":
-		if fileList, returnedError := getFileList(bs, cryptoKeys.EncryptionKey); returnedError == nil {
+		var fileList []string
+		if fileList, returnedError = getFileList(bs, cryptoKeys.EncryptionKey, ""); returnedError == nil {
 			enumeratePrint(fileList)
 		}
 	}

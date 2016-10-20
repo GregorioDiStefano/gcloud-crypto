@@ -3,12 +3,11 @@ package main
 import (
 	"errors"
 	"fmt"
+	googleAPI "google.golang.org/api/googleapi"
+	storage "google.golang.org/api/storage/v1"
 	"io"
 	"io/ioutil"
 	"os"
-
-	googleAPI "google.golang.org/api/googleapi"
-	storage "google.golang.org/api/storage/v1"
 )
 
 type bucketService struct {
@@ -64,10 +63,11 @@ func (bs bucketService) uploadToBucket(fileToUpload, encryptedUploadPath string)
 	object := &storage.Object{Name: encryptedUploadPath}
 
 	file, err := os.Open(fileToUpload)
+
 	defer os.Remove(fileToUpload)
 
 	if err != nil {
-		return errors.New("Failed opening file: " + fileToUpload)
+		return errors.New("Failed opening file: " + fileToUpload + ", error: " + err.Error())
 	}
 
 	if fileStat, err := os.Stat(fileToUpload); err == nil {

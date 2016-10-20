@@ -11,6 +11,15 @@ import (
 
 type decryptedToEncryptedFilePath map[string]string
 
+func isStringInSlice(s string, list []string) bool {
+	for _, e := range list {
+		if e == s {
+			return true
+		}
+	}
+	return false
+}
+
 func getDecryptedToEncryptedFileMapping(encryptedFilePaths []string, key []byte) decryptedToEncryptedFilePath {
 	m := make(decryptedToEncryptedFilePath, len(encryptedFilePaths))
 	for _, e := range encryptedFilePaths {
