@@ -10,10 +10,11 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
-	"golang.org/x/crypto/scrypt"
 	"io"
 	"io/ioutil"
 	"os"
+
+	"golang.org/x/crypto/scrypt"
 )
 
 type Keys struct {
@@ -49,11 +50,11 @@ func generateRandomIV() []byte {
 
 func GetKeyFromPassphrase(passphrase, salt []byte, N, r, p int) (*Keys, error) {
 	if passphrase == nil || salt == nil {
-		return nil, errors.New(noSaltOrPassword)
+		panic(noSaltOrPassword)
 	}
 
 	if len(salt) < 8 {
-		return nil, errors.New(saltTooSmall)
+		panic(saltTooSmall)
 	}
 
 	k, err := scrypt.Key([]byte(passphrase), salt, N, r, p, 64)
@@ -117,7 +118,7 @@ func DecryptText(cryptoText string, key []byte) (string, error) {
 	return fmt.Sprintf("%s", plaintext), nil
 }
 
-func EncryptFile(filename string, keys Keys) (string, error) {
+func EncryptFile(filename string, keys *Keys) (string, error) {
 	outputFilename := fmt.Sprintf("%s.%s", filename, "enc")
 	readFile, err := os.Open(filename)
 	defer readFile.Close()
@@ -151,7 +152,7 @@ func EncryptFile(filename string, keys Keys) (string, error) {
 
 	writeFile.Sync()
 
-	if hmac, err := calculateHMAC(keys.HMACKey, iv, *writeFile); err == nil {
+	if hmac, err := calculateHMAC(keys.HMACKey, iv, writeFile); err == nil {
 		addHMACToFile(outputFilename, hmac)
 	} else {
 		fmt.Println("ERR: ", err)
@@ -161,7 +162,7 @@ func EncryptFile(filename string, keys Keys) (string, error) {
 	return outputFilename, nil
 }
 
-func DecryptFile(filename string, keys Keys) (string, error) {
+func DecryptFile(filename string, keys *Keys) (string, error) {
 	iv := make([]byte, aes.BlockSize)
 	readFile, err := os.Open(filename)
 
@@ -200,7 +201,7 @@ func DecryptFile(filename string, keys Keys) (string, error) {
 		return "", err
 	}
 
-	if actualHMAC, err := calculateHMAC(keys.HMACKey, iv, *readFile); err != nil || !bytes.Equal(actualHMAC, expectedHMAC) {
+	if actualHMAC, err := calculateHMAC(keys.HMACKey, iv, readFile); err != nil || !bytes.Equal(actualHMAC, expectedHMAC) {
 		fmt.Println("Failed to validate HMAC")
 		return "", errors.New(hmacValidationFailed)
 	}
@@ -214,7 +215,7 @@ func DecryptFile(filename string, keys Keys) (string, error) {
 }
 
 // compute HMAC-SHA256 as: hmac(key, IV + cipherText)
-func calculateHMAC(key, iv []byte, fh os.File) ([]byte, error) {
+func calculateHMAC(key, iv []byte, fh *os.File) ([]byte, error) {
 	const idealBufferSize = 16 * 1024
 	fh.Seek(0, 0)
 

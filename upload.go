@@ -45,7 +45,7 @@ func findExistingPath(bs bucketService, keys simplecrypto.Keys, uploadDirectoryP
 }
 
 func doUpload(bs *bucketService, keys simplecrypto.Keys, uploadFile, remoteDirectory string) error {
-	encryptedFile, err := simplecrypto.EncryptFile(uploadFile, keys)
+	encryptedFile, err := simplecrypto.EncryptFile(uploadFile, &keys)
 	encryptedPath := ""
 
 	if err != nil {

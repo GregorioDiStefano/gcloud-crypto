@@ -41,7 +41,7 @@ func doDownload(bs *bucketService, keys simplecrypto.Keys, filename, destination
 
 			defer os.Remove(downloadedEncryptedFile)
 
-			downloadedPlaintextFile, err := simplecrypto.DecryptFile(downloadedEncryptedFile, keys)
+			downloadedPlaintextFile, err := simplecrypto.DecryptFile(downloadedEncryptedFile, &keys)
 			defer os.Remove(downloadedPlaintextFile)
 
 			if err != nil {

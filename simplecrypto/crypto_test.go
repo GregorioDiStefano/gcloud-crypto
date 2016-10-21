@@ -118,6 +118,7 @@ func TestEncryptDecryptFile(t *testing.T) {
 		{[]byte("foobar"), []byte("longtestiv123456"), "test_data/test-encrypt_decrypt_2", nil},
 		{[]byte("foobar"), []byte("longtestiv123456"), "test_data/test-encrypt_decrypt_3", nil},
 		{[]byte("foobar"), []byte("longtestiv123456"), "test_data/test-encrypt_decrypt_4", nil},
+		{[]byte("foobar"), []byte("longtestiv123456"), "test_data/test-encrypt_decrypt_5", nil},
 		{[]byte("foobar"), []byte("longtestiv123456"), "test_data/404", errors.New(unableToOpenFileReading)},
 	}
 
@@ -125,7 +126,7 @@ func TestEncryptDecryptFile(t *testing.T) {
 		key, _ := GetKeyFromPassphrase(e.key, e.iv, 4096, 16, 1)
 
 		dataToEncrypt, _ := ioutil.ReadFile(e.filepath)
-		encryptedFilename, err := EncryptFile(e.filepath, *key)
+		encryptedFilename, err := EncryptFile(e.filepath, key)
 
 		if e.expectedError != nil {
 			assert.Equal(t, e.expectedError, err)
@@ -142,7 +143,7 @@ func TestEncryptDecryptFile(t *testing.T) {
 
 		assert.NotEqual(t, encryptedDataBytes, dataToEncrypt)
 
-		plainTextFile, err := DecryptFile(encryptedFilename, *key)
+		plainTextFile, err := DecryptFile(encryptedFilename, key)
 		defer os.Remove(plainTextFile)
 
 		if err != nil {
@@ -178,7 +179,7 @@ func TestCalculateHMAC(t *testing.T) {
 	for _, h := range calculateHMACTests {
 		fh, err := os.Open(h.filepath)
 
-		HMAC, err := calculateHMAC(h.key, h.iv, *fh)
+		HMAC, err := calculateHMAC(h.key, h.iv, fh)
 
 		if err == nil {
 			assert.True(t, hex.EncodeToString(HMAC) == h.expectedHMACHex, "HMAC calculation failed")
@@ -200,12 +201,24 @@ func TestGetKeyFromPassphrase(t *testing.T) {
 func TestGetKeyFromPassphraseError_1(t *testing.T) {
 	t.Parallel()
 
+	defer func() {
+		if r := recover(); r == nil {
+			t.Errorf("The code did not panic")
+		}
+	}()
+
 	_, err := GetKeyFromPassphrase([]byte(""), []byte("abc"), 4096, 16, 1)
 	assert.Error(t, err, "No error returned")
 }
 
 func TestGetKeyFromPassphraseError_2(t *testing.T) {
 	t.Parallel()
+
+	defer func() {
+		if r := recover(); r == nil {
+			t.Errorf("The code did not panic")
+		}
+	}()
 
 	_, err := GetKeyFromPassphrase(nil, []byte("abcd1234"), 4096, 16, 1)
 	assert.Error(t, err, "No error returned")
