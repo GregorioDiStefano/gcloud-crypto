@@ -1,13 +1,21 @@
 package main
 
 import (
+	b64 "encoding/base64"
 	"errors"
 	"fmt"
-	googleAPI "google.golang.org/api/googleapi"
-	storage "google.golang.org/api/storage/v1"
 	"io"
 	"io/ioutil"
 	"os"
+
+	"github.com/GregorioDiStefano/gcloud-fuse/simplecrypto"
+	"github.com/Sirupsen/logrus"
+	googleAPI "google.golang.org/api/googleapi"
+	storage "google.golang.org/api/storage/v1"
+)
+
+const (
+	hashMismatchErr = "hash mismatch of uploaded file"
 )
 
 type bucketService struct {
@@ -57,13 +65,11 @@ func (bs bucketService) deleteObject(encryptedFilePath string) error {
 	return nil
 }
 
-func (bs bucketService) uploadToBucket(fileToUpload, encryptedUploadPath string) error {
+func (bs bucketService) uploadToBucket(fileToUpload string, keys simplecrypto.Keys, expectedMD5Hash []byte, encryptedUploadPath string) error {
 	var fileSize int64
 
 	object := &storage.Object{Name: encryptedUploadPath}
-
 	file, err := os.Open(fileToUpload)
-
 	defer os.Remove(fileToUpload)
 
 	if err != nil {
@@ -85,7 +91,14 @@ func (bs bucketService) uploadToBucket(fileToUpload, encryptedUploadPath string)
 	}
 
 	if res, err := bs.service.Objects.Insert(bs.bucket.name, object).ProgressUpdater(pu).Media(file).Do(); err == nil {
-		fmt.Printf("Created object %v at location %v\n\n", res.Name, res.SelfLink)
+		if actualMD5Hash, err := b64.URLEncoding.DecodeString(res.Md5Hash); err == nil {
+			if string(expectedMD5Hash) != string(actualMD5Hash) {
+				log.WithFields(logrus.Fields{"expected md5": expectedMD5Hash, "actual md5": actualMD5Hash}).Warn("Uploaded file is corrupted")
+				bs.doDeleteObject(keys, encryptedUploadPath, true)
+				return errors.New(hashMismatchErr)
+			}
+		}
+		log.WithFields(logrus.Fields{"filename": encryptedUploadPath}).Debug("Created object successfully.")
 	} else {
 		return errors.New("Failed to upload")
 	}
@@ -114,7 +127,7 @@ func (bs bucketService) downloadFromBucket(encryptedFilePath string) (string, er
 	pt := &PassThrough{Reader: download.Body, contentLength: download.ContentLength}
 
 	if written, err := io.Copy(writeFile, pt); err != nil {
-		fmt.Println(err)
+		log.Warn("error when downloading file: %s, %s", writeFile.Name(), err.Error())
 	} else if written != download.ContentLength {
 		return saveFilename, errors.New("Download failed, file was not entirely downloaded")
 	}

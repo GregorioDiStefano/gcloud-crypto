@@ -4,6 +4,7 @@ import (
 	"crypto/sha256"
 	"fmt"
 
+	"github.com/Sirupsen/logrus"
 	"github.com/spf13/viper"
 )
 
@@ -46,7 +47,8 @@ func parseConfig() *userData {
 	viper.SetDefault("salt", viper.GetString("project_id"))
 
 	saltString := viper.GetString("salt")
-
 	salt := []byte(saltStringToSHA256(saltString))
+
+	log.WithFields(logrus.Fields{"bucket": viper.GetString("bucket"), "project_id": viper.GetString("project_id")}).Debug("Loaded config")
 	return &userData{viper.GetViper(), salt}
 }

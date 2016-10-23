@@ -98,7 +98,7 @@ func interactiveMode(rl *readline.Instance, bs *bucketService, cryptoKeys simple
 			}
 		case strings.HasPrefix(line, "delete"):
 			filepath := strings.TrimSpace(strings.TrimLeft(line, "delete"))
-			returnedError = doDeleteObject(bs, cryptoKeys, filepath)
+			returnedError = bs.doDeleteObject(cryptoKeys, filepath, false)
 
 		case strings.HasPrefix(line, "download"):
 			cleanLine := strings.TrimSpace(strings.TrimLeft(line, "download"))
@@ -124,7 +124,7 @@ func parseCmdLine(bs *bucketService, cryptoKeys simplecrypto.Keys) {
 
 	switch {
 	case flag.Lookup("delete").Value.String() != "":
-		returnedError = doDeleteObject(bs, cryptoKeys, flag.Lookup("delete").Value.String())
+		returnedError = bs.doDeleteObject(cryptoKeys, flag.Lookup("delete").Value.String(), false)
 	case flag.Lookup("upload").Value.String() != "":
 		path := flag.Lookup("upload").Value.String()
 		returnedError = processUpload(bs, cryptoKeys, path, flag.Lookup("dir").Value.String())

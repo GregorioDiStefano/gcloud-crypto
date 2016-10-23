@@ -1,12 +1,13 @@
 package main
 
 import (
+	"crypto/md5"
 	"errors"
 	"fmt"
+	"github.com/GregorioDiStefano/gcloud-fuse/simplecrypto"
+	"io"
 	"os"
 	"strings"
-
-	"github.com/GregorioDiStefano/gcloud-fuse/simplecrypto"
 )
 
 type decryptedToEncryptedFilePath map[string]string
@@ -81,6 +82,25 @@ func isDir(filepath string) bool {
 		return fileStat.IsDir()
 	}
 	return false
+}
+
+func getFileMD5(filePath string) ([]byte, error) {
+	var result []byte
+
+	file, err := os.Open(filePath)
+	if err != nil {
+		return result, err
+	}
+
+	defer file.Close()
+
+	hash := md5.New()
+
+	if _, err := io.Copy(hash, file); err != nil {
+		return result, err
+	}
+
+	return hash.Sum(result), nil
 }
 
 /*

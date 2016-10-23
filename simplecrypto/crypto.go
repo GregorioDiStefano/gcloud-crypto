@@ -5,17 +5,20 @@ import (
 	"crypto/aes"
 	"crypto/cipher"
 	"crypto/hmac"
+	"crypto/md5"
 	"crypto/rand"
 	"crypto/sha256"
 	"encoding/base64"
 	"errors"
 	"fmt"
+	"github.com/Sirupsen/logrus"
+	"golang.org/x/crypto/scrypt"
 	"io"
 	"io/ioutil"
 	"os"
-
-	"golang.org/x/crypto/scrypt"
 )
+
+var log = logrus.New()
 
 type Keys struct {
 	EncryptionKey []byte
@@ -34,6 +37,10 @@ const (
 	errorReadingIV   = "Unable to read IV from file"
 	errorReadingHMAC = "Unable to extract HMAC from file"
 )
+
+func init() {
+	log.Level = logrus.DebugLevel
+}
 
 func randomBytes(length int) []byte {
 	rb := make([]byte, length)
@@ -118,48 +125,65 @@ func DecryptText(cryptoText string, key []byte) (string, error) {
 	return fmt.Sprintf("%s", plaintext), nil
 }
 
-func EncryptFile(filename string, keys *Keys) (string, error) {
+/*
+// Nice for debugging, so leaving here
+func (pt passThrough) Write(p []byte) (n int, err error) {
+	fmt.Println("bytes: ", hex.EncodeToString(p), "\n")
+	return len(p), nil
+}
+
+type passThrough struct {
+	io.Writer
+}
+*/
+
+func EncryptFile(filename string, keys *Keys) (string, []byte, error) {
 	outputFilename := fmt.Sprintf("%s.%s", filename, "enc")
 	readFile, err := os.Open(filename)
+	md5Hash := md5.New()
+
 	defer readFile.Close()
 
 	if err != nil {
-		return "", errors.New(unableToOpenFileReading)
+		log.Fatal("error opening: ", readFile.Name())
+		return "", nil, errors.New(unableToOpenFileReading)
 	}
 
 	writeFile, err := os.OpenFile(outputFilename, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0600)
 
 	if err != nil {
-		return "", err
+		return "", nil, err
 	}
 	defer writeFile.Close()
 
 	block, err := aes.NewCipher(keys.EncryptionKey)
 
 	if err != nil {
-		return "", err
+		return "", nil, err
 	}
 
 	iv := generateRandomIV()
+	md5Hash.Write(iv)
 
-	writer := &cipher.StreamWriter{S: cipher.NewCTR(block, iv), W: writeFile}
+	writer := &cipher.StreamWriter{S: cipher.NewCTR(block, iv), W: io.MultiWriter(writeFile, md5Hash)}
+
 	writeFile.Write(iv)
 
 	if _, err := io.Copy(writer, readFile); err != nil {
-		fmt.Println("error during crypto: " + err.Error())
-		return "", err
+		log.Fatal("error during crypto: " + err.Error())
+		return "", nil, err
 	}
 
 	writeFile.Sync()
 
 	if hmac, err := calculateHMAC(keys.HMACKey, iv, writeFile); err == nil {
 		addHMACToFile(outputFilename, hmac)
+		md5Hash.Write(hmac)
 	} else {
-		fmt.Println("ERR: ", err)
-		return "", err
+		return "", nil, err
 	}
 
-	return outputFilename, nil
+	return outputFilename, md5Hash.Sum(nil), nil
 }
 
 func DecryptFile(filename string, keys *Keys) (string, error) {
@@ -202,7 +226,7 @@ func DecryptFile(filename string, keys *Keys) (string, error) {
 	}
 
 	if actualHMAC, err := calculateHMAC(keys.HMACKey, iv, readFile); err != nil || !bytes.Equal(actualHMAC, expectedHMAC) {
-		fmt.Println("Failed to validate HMAC")
+		log.Fatal("Failed to validate HMAC")
 		return "", errors.New(hmacValidationFailed)
 	}
 
@@ -271,6 +295,5 @@ func addHMACToFile(filepath string, hmac []byte) error {
 	}
 
 	f.Write(hmac)
-
 	return nil
 }

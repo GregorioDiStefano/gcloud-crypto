@@ -9,8 +9,9 @@ import (
 
 func TestDoDeleteObject(t *testing.T) {
 	bs, keys := setupUp()
-
 	defer tearDown(bs)
+
+	time.Sleep(3 * time.Second)
 
 	uploadTests := []struct {
 		uploadFilepath       string
@@ -26,8 +27,8 @@ func TestDoDeleteObject(t *testing.T) {
 
 	for _, e := range uploadTests {
 		if err := processUpload(bs, keys, e.uploadFilepath, e.destinationDirectory); err == nil {
-			doDeleteObject(bs, keys, e.destinationDirectory+"/"+e.uploadFilepath)
-			time.Sleep(15 * time.Second)
+			bs.doDeleteObject(keys, e.destinationDirectory+"/"+e.uploadFilepath, false)
+			time.Sleep(10 * time.Second)
 			fileList, err := getFileList(bs, keys.EncryptionKey, "")
 			assert.Empty(t, fileList)
 			assert.Empty(t, err)

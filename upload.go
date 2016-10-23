@@ -36,7 +36,6 @@ func findExistingPath(bs bucketService, keys simplecrypto.Keys, uploadDirectoryP
 
 		for e := range decryptedToEncryptedFiles {
 			if filepath.Dir(e) == uploadDirectoryPath {
-				fmt.Println("found already existing directory")
 				return decryptedToEncryptedFiles[e]
 			}
 		}
@@ -45,7 +44,7 @@ func findExistingPath(bs bucketService, keys simplecrypto.Keys, uploadDirectoryP
 }
 
 func doUpload(bs *bucketService, keys simplecrypto.Keys, uploadFile, remoteDirectory string) error {
-	encryptedFile, err := simplecrypto.EncryptFile(uploadFile, &keys)
+	encryptedFile, md5Hash, err := simplecrypto.EncryptFile(uploadFile, &keys)
 	encryptedPath := ""
 
 	if err != nil {
@@ -83,12 +82,12 @@ func doUpload(bs *bucketService, keys simplecrypto.Keys, uploadFile, remoteDirec
 		return err
 	}
 
-	return bs.uploadToBucket(encryptedFile, encryptedPath)
+	return bs.uploadToBucket(encryptedFile, keys, md5Hash, encryptedPath)
 }
 
 func processUpload(bs *bucketService, keys simplecrypto.Keys, uploadPath, remoteDirectory string) error {
 	globMatch, err := filepath.Glob(uploadPath)
-	var errorUploading bool
+	errorOccured := false
 
 	if err != nil {
 		return err
@@ -112,14 +111,22 @@ func processUpload(bs *bucketService, keys simplecrypto.Keys, uploadPath, remote
 		}
 
 		if err != nil {
-			errorUploading = true
-			fmt.Println(fmt.Sprintf("failed with %s when uploading: %s", err.Error(), path))
-			os.Remove(uploadPath + ".enc")
+			errorOccured = true
+			switch err.Error() {
+			case fileAlreadyExistsError:
+				fmt.Println("file already exists, skipping upload.")
+				os.Remove(uploadPath + ".enc")
+			default:
+				fmt.Println(fmt.Sprintf("failed with %s when uploading: %s", err.Error(), path))
+				os.Remove(uploadPath + ".enc")
+				return err
+			}
 		}
 	}
 
-	if errorUploading {
+	if errorOccured {
 		return errors.New(fileUploadFailError)
 	}
+
 	return nil
 }

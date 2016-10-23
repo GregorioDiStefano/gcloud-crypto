@@ -104,7 +104,7 @@ func TestEncryptDecryptText_2(t *testing.T) {
 }
 
 func TestEncryptDecryptFile(t *testing.T) {
-	t.Parallel()
+	//	t.Parallel()
 
 	const tempFile = "/tmp/plaintext-file"
 	encryptDecryptTests := []struct {
@@ -115,11 +115,11 @@ func TestEncryptDecryptFile(t *testing.T) {
 		expectedError error
 	}{
 		{[]byte("foobar"), []byte("longtestiv123456"), "test_data/test-encrypt_decrypt_1", nil},
-		{[]byte("foobar"), []byte("longtestiv123456"), "test_data/test-encrypt_decrypt_2", nil},
-		{[]byte("foobar"), []byte("longtestiv123456"), "test_data/test-encrypt_decrypt_3", nil},
-		{[]byte("foobar"), []byte("longtestiv123456"), "test_data/test-encrypt_decrypt_4", nil},
-		{[]byte("foobar"), []byte("longtestiv123456"), "test_data/test-encrypt_decrypt_5", nil},
-		{[]byte("foobar"), []byte("longtestiv123456"), "test_data/404", errors.New(unableToOpenFileReading)},
+		/*		{[]byte("foobar"), []byte("longtestiv123456"), "test_data/test-encrypt_decrypt_2", nil},
+				{[]byte("foobar"), []byte("longtestiv123456"), "test_data/test-encrypt_decrypt_3", nil},
+				{[]byte("foobar"), []byte("longtestiv123456"), "test_data/test-encrypt_decrypt_4", nil},
+				{[]byte("foobar"), []byte("longtestiv123456"), "test_data/test-encrypt_decrypt_5", nil},
+				{[]byte("foobar"), []byte("longtestiv123456"), "test_data/404", errors.New(unableToOpenFileReading)},*/
 	}
 
 	for _, e := range encryptDecryptTests {
@@ -133,7 +133,10 @@ func TestEncryptDecryptFile(t *testing.T) {
 			return
 		}
 
+		fmt.Println("encrypted filename: ", encryptedFilename)
 		encryptedDataBytes, err := ioutil.ReadFile(encryptedFilename)
+
+		fmt.Println("encrypted bytes: ", hex.EncodeToString(encryptedDataBytes))
 
 		if err != nil {
 			panic(err)
@@ -157,6 +160,7 @@ func TestEncryptDecryptFile(t *testing.T) {
 		}
 
 		assert.Equal(t, decryptedDataBytes, dataToEncrypt)
+
 	}
 
 }

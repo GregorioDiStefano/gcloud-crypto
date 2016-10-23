@@ -14,7 +14,11 @@ import (
 	"golang.org/x/net/context"
 	"golang.org/x/oauth2/google"
 	"google.golang.org/api/storage/v1"
+
+	"github.com/Sirupsen/logrus"
 )
+
+var log = logrus.New()
 
 func init() {
 	flag.Bool("i", false, "interactive mode")
@@ -33,6 +37,8 @@ const (
 
 func main() {
 	flag.Parse()
+	log.Level = logrus.DebugLevel
+
 	userData := parseConfig()
 
 	fmt.Print("Password: ")
@@ -73,7 +79,7 @@ func main() {
 	bs := NewBucketService(*service, userData.configFile.GetString("bucket"), userData.configFile.GetString("project_id"))
 
 	if err := verifyPassword(bs, *cryptoKeys); err != nil {
-		fmt.Println(err)
+		log.Warn(err)
 		os.Exit(1)
 	}
 

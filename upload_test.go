@@ -3,9 +3,7 @@ package main
 import (
 	"context"
 	"errors"
-	"fmt"
 	"io/ioutil"
-	"log"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -14,13 +12,15 @@ import (
 	"time"
 
 	"github.com/GregorioDiStefano/gcloud-fuse/simplecrypto"
-	_ "github.com/ryanuber/go-glob"
+	"github.com/Sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"golang.org/x/oauth2/google"
 	"google.golang.org/api/storage/v1"
 )
 
-var randomFileTestFilename string
+func init() {
+	log.Level = logrus.DebugLevel
+}
 
 func setupUp() (*bucketService, simplecrypto.Keys) {
 	client, err := google.DefaultClient(context.Background(), storage.DevstorageFullControlScope)
@@ -45,8 +45,6 @@ func setupUp() (*bucketService, simplecrypto.Keys) {
 		panic(err)
 	}
 
-	randomFileTestFilename = randomFile()
-
 	return bs, *keys
 }
 
@@ -55,7 +53,6 @@ func tearDown(bs *bucketService) {
 	for _, e := range objs {
 		bs.deleteObject(e)
 	}
-	os.Remove(randomFileTestFilename)
 }
 
 func randomFile() string {
@@ -69,13 +66,16 @@ func TestDoUpload(t *testing.T) {
 
 	defer tearDown(bs)
 
+	randomFileTestFilename := randomFile()
+	defer os.Remove(randomFileTestFilename)
+
 	uploadTests := []struct {
 		uploadFilepath       string
 		destinationDirectory string
 
 		deleteAfterTest   bool
 		srcType           string
-		expectedError     error
+		expectedError     interface{}
 		expectedStructure []string
 	}{
 		{"testdata/*", "test1", true, "dir", nil, []string{
@@ -85,6 +85,8 @@ func TestDoUpload(t *testing.T) {
 			"test1/testdata/nested_2/testdata2",
 			"test1/testdata/nested_3/testdata1",
 			"test1/testdata/nested_3/testdata2",
+			"test1/testdata/nested_3/testdata3",
+			"test1/testdata/nested_3/testdata4",
 			"test1/testdata/test_a/a",
 			"test1/testdata/test_b/b",
 			"test1/testdata/testdata1",
@@ -94,22 +96,32 @@ func TestDoUpload(t *testing.T) {
 			"test1/testdata/testdata5",
 			"test1/testdata/testdata6"}},
 		{"testdata/testdata1", "test2", false, "file", nil, []string{"test2/testdata/testdata1"}},
-		{"testdata/testdata1", "test2", true, "file", errors.New(fileUploadFailError), nil},
 		{"testdata/file_that_doesnt_exist", "test3", true, "file", errors.New(fileNotFoundError), nil},
-		{"testdata/nested_3/", "test3", true, "dir", nil, []string{"test3/testdata/nested_3/testdata1", "test3/testdata/nested_3/testdata2"}},
+		{"testdata/nested_3/", "test3", true, "dir", nil, []string{
+			"test3/testdata/nested_3/testdata1",
+			"test3/testdata/nested_3/testdata2",
+			"test3/testdata/nested_3/testdata3",
+			"test3/testdata/nested_3/testdata4"}},
 		{"testdata/nested_3/*1*", "test4", true, "", nil, []string{"test4/testdata/nested_3/testdata1"}},
 		{"testdata/test_*", "test5", true, "", nil, []string{"test5/testdata/test_a/a", "test5/testdata/test_b/b"}},
-		{randomFileTestFilename, "", false, "", nil, []string{randomFileTestFilename}},
+		{randomFileTestFilename, "", true, "", nil, []string{randomFileTestFilename}},
 	}
 
-	for _, e := range uploadTests {
+	for c, e := range uploadTests {
+		log.Info("Running #", c)
+
 		path := e.uploadFilepath
 		remoteDirectory := e.destinationDirectory
 
 		err := processUpload(bs, keys, path, remoteDirectory)
+
+		if err != nil {
+			log.Debug("Error uploading: ", err)
+		}
+
 		assert.Equal(t, err, e.expectedError)
 
-		time.Sleep(20 * time.Second)
+		time.Sleep(3 * time.Second)
 
 		if e.expectedError == nil {
 			filesInBucket, err := getFileList(bs, keys.EncryptionKey, "")
@@ -129,7 +141,6 @@ func TestDoUpload(t *testing.T) {
 				assert.Nil(t, err)
 			case "dir":
 				out, err := exec.Command("diff", "-r", "-q", filepath.Dir(e.uploadFilepath), tempDir+"/"+e.destinationDirectory+"/"+filepath.Dir(e.uploadFilepath)).Output()
-				fmt.Println(t, string(out))
 				assert.Empty(t, out)
 				assert.Nil(t, err)
 			case "glob":
@@ -146,4 +157,26 @@ func TestDoUpload(t *testing.T) {
 		}
 
 	}
+}
+
+func TestDoUploadResume(t *testing.T) {
+	bs, keys := setupUp()
+
+	defer tearDown(bs)
+
+	err := processUpload(bs, keys, "testdata/testdata1", "")
+	assert.Nil(t, err)
+
+	// how to actually check the file was not reuploaded?
+	err = processUpload(bs, keys, "testdata/testdata*", "")
+	assert.Equal(t, err.Error(), fileUploadFailError)
+
+	filesInBucket, err := getFileList(bs, keys.EncryptionKey, "")
+	assert.Equal(t, []string{
+		"/testdata/testdata1",
+		"/testdata/testdata2",
+		"/testdata/testdata3",
+		"/testdata/testdata4",
+		"/testdata/testdata5",
+		"/testdata/testdata6"}, filesInBucket)
 }
