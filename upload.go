@@ -6,8 +6,10 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"strings"
 
 	"github.com/GregorioDiStefano/gcloud-fuse/simplecrypto"
+	"github.com/Sirupsen/logrus"
 )
 
 const (
@@ -51,7 +53,7 @@ func doUpload(bs *bucketService, keys simplecrypto.Keys, uploadFile, remoteDirec
 		panic(err)
 	}
 
-	fmt.Println("Encrypting complete.")
+	log.WithFields(logrus.Fields{"filename": uploadFile}).Debug("Encryption of file complete.")
 
 	objects, err := bs.getObjects()
 
@@ -59,19 +61,25 @@ func doUpload(bs *bucketService, keys simplecrypto.Keys, uploadFile, remoteDirec
 		panic(err)
 	}
 
-	fmt.Println("Uploading to: ", remoteDirectory)
-
 	decToEncPaths := getDecryptedToEncryptedFileMapping(objects, keys.EncryptionKey)
 
 	if remoteDirectory == "" && filepath.Dir(uploadFile) == "." {
 		encryptedPath = encryptFilePath(uploadFile, keys.EncryptionKey)
 	} else {
+
+		if strings.HasPrefix(remoteDirectory, "/") {
+			remoteDirectory = remoteDirectory[1:]
+		}
+
 		finalRemoteUploadPath := filepath.Clean(remoteDirectory + "/" + filepath.Dir(uploadFile) + "/" + filepath.Base(uploadFile))
 		finalRemoteUploadDirectoryPath := filepath.Dir(finalRemoteUploadPath)
-		fmt.Println("upload directory: ", finalRemoteUploadDirectoryPath, "final upload path: ", finalRemoteUploadPath)
+
 		if matchingDirectory := findExistingPath(*bs, keys, finalRemoteUploadDirectoryPath); matchingDirectory != "" {
-			encryptedFilename, _ := simplecrypto.EncryptText(path.Base(uploadFile), keys.EncryptionKey)
-			encryptedPath = filepath.Dir(matchingDirectory) + "/" + encryptedFilename
+			if encryptedFilename, err := simplecrypto.EncryptText(path.Base(uploadFile), keys.EncryptionKey); err == nil {
+				encryptedPath = filepath.Dir(matchingDirectory) + "/" + encryptedFilename
+			} else {
+				return err
+			}
 		} else {
 			encryptedPath = encryptFilePath(finalRemoteUploadPath, keys.EncryptionKey)
 		}
@@ -82,6 +90,7 @@ func doUpload(bs *bucketService, keys simplecrypto.Keys, uploadFile, remoteDirec
 		return err
 	}
 
+	log.WithFields(logrus.Fields{"filename": uploadFile, "remoteDirectory": remoteDirectory}).Info("Uploading file")
 	return bs.uploadToBucket(encryptedFile, keys, md5Hash, encryptedPath)
 }
 

@@ -7,6 +7,7 @@ import (
 	"io"
 	"io/ioutil"
 	"os"
+	"time"
 
 	"github.com/GregorioDiStefano/gcloud-fuse/simplecrypto"
 	"github.com/Sirupsen/logrus"
@@ -158,4 +159,23 @@ func (bs bucketService) getObjects() ([]string, error) {
 		}
 	}
 	return objects, nil
+}
+
+func (bs bucketService) moveObject(src, dst string) error {
+	if rr, err := bs.service.Objects.Rewrite(bs.bucket.name, src, bs.bucket.name, dst, nil).Do(); err == nil {
+
+		for !rr.Done {
+			log.Debug("Waiting for file to be rewritten to new destination")
+			time.Sleep(1 * time.Second)
+		}
+
+	} else {
+		return err
+	}
+
+	if err := bs.deleteObject(src); err != nil {
+		return err
+	}
+
+	return nil
 }

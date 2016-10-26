@@ -3,15 +3,16 @@ package main
 import (
 	"errors"
 	"fmt"
-	"github.com/stretchr/testify/assert"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestHashMismatch(t *testing.T) {
 	bs, keys := setupUp()
 	defer tearDown(bs)
 
-	fmt.Println(getFileList(bs, keys.EncryptionKey, ""))
+	getFileList(bs, keys.EncryptionKey, "")
 	file1 := encryptFilePath("test0", keys.EncryptionKey)
 	file2 := encryptFilePath("test1", keys.EncryptionKey)
 
@@ -27,4 +28,25 @@ func TestHashMismatch(t *testing.T) {
 	assert.Equal(t, err, errors.New(hashMismatchErr))
 	filesInBucket, err := getFileList(bs, keys.EncryptionKey, "")
 	assert.Equal(t, []string{"test0"}, filesInBucket)
+}
+
+func TestMoveObject(t *testing.T) {
+	bs, keys := setupUp()
+	defer tearDown(bs)
+
+	srcFile := encryptFilePath("test0", keys.EncryptionKey)
+	dstFile := encryptFilePath("dst", keys.EncryptionKey)
+
+	randomFileTestFilename := randomFile()
+	md5hash, _ := getFileMD5(randomFileTestFilename)
+
+	bs.uploadToBucket(randomFileTestFilename, keys, md5hash, srcFile)
+
+	bs.moveObject(srcFile, dstFile)
+
+	files, err := getFileList(bs, keys.EncryptionKey, "")
+
+	assert.Nil(t, err)
+	assert.Len(t, files, 1)
+	assert.Contains(t, files, "dst")
 }
