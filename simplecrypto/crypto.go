@@ -11,11 +11,12 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
-	"github.com/Sirupsen/logrus"
-	"golang.org/x/crypto/scrypt"
 	"io"
 	"io/ioutil"
 	"os"
+
+	"github.com/Sirupsen/logrus"
+	"golang.org/x/crypto/scrypt"
 )
 
 var log = logrus.New()
@@ -177,7 +178,7 @@ func EncryptFile(filename string, keys *Keys) (string, []byte, error) {
 	writeFile.Sync()
 
 	if hmac, err := calculateHMAC(keys.HMACKey, iv, writeFile); err == nil {
-		addHMACToFile(outputFilename, hmac)
+		addHMACToFile(writeFile, hmac)
 		md5Hash.Write(hmac)
 	} else {
 		return "", nil, err
@@ -260,6 +261,7 @@ func calculateHMAC(key, iv []byte, fh *os.File) ([]byte, error) {
 			return nil, err
 		}
 
+		fh.Sync()
 		hash.Write(data)
 	}
 
@@ -282,18 +284,11 @@ func truncateHMACSignature(file *os.File) ([]byte, error) {
 	return extractedHMAC, nil
 }
 
-func addHMACToFile(filepath string, hmac []byte) error {
+func addHMACToFile(file *os.File, hmac []byte) error {
 	if len(hmac) != sha256.Size {
 		panic("Adding HMAC of incorrect size, this should never happen")
 	}
 
-	f, err := os.OpenFile(filepath, os.O_APPEND|os.O_WRONLY, 0600)
-	defer f.Close()
-
-	if err != nil {
-		return errors.New(unableToOpenFileWriting)
-	}
-
-	f.Write(hmac)
+	file.Write(hmac)
 	return nil
 }
