@@ -7,7 +7,6 @@ import (
 	"strings"
 
 	"github.com/GregorioDiStefano/gcloud-fuse/simplecrypto"
-	_ "github.com/GregorioDiStefano/go-file-storage/log"
 	"github.com/Sirupsen/logrus"
 	"github.com/ryanuber/go-glob"
 )

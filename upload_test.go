@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"sort"
 	_ "strings"
 	"testing"
 	"time"
@@ -164,7 +165,6 @@ func TestDoUpload(t *testing.T) {
 
 func TestDoUploadResume(t *testing.T) {
 	bs, keys := setupUp()
-
 	defer tearDown(bs)
 
 	err := processUpload(bs, &keys, "testdata/testdata1", "")
@@ -182,4 +182,41 @@ func TestDoUploadResume(t *testing.T) {
 		"/testdata/testdata4",
 		"/testdata/testdata5",
 		"/testdata/testdata6"}, filesInBucket)
+}
+
+func TestDoUploadDirectoryAndResume(t *testing.T) {
+	bs, keys := setupUp()
+	defer tearDown(bs)
+
+	expectedOutput := []string{
+		"/testdata/testdata1",
+		"/testdata/testdata2",
+		"/testdata/testdata3",
+		"/testdata/testdata4",
+		"/testdata/testdata5",
+		"/testdata/testdata6",
+		"/testdata/nested_1/nested_nested_1/nested_nested_nested_1/testdata1",
+		"/testdata/nested_1/nested_nested_1/testdata1",
+		"/testdata/nested_1/testdata1",
+		"/testdata/nested_2/testdata2",
+		"/testdata/nested_3/testdata1",
+		"/testdata/nested_3/testdata2",
+		"/testdata/nested_3/testdata3",
+		"/testdata/nested_3/testdata4",
+		"/testdata/test_a/a",
+		"/testdata/test_b/b",
+	}
+
+	sort.Strings(expectedOutput)
+
+	err := processUpload(bs, &keys, "testdata/testdata1", "")
+	assert.Nil(t, err)
+
+	// how to actually check the file was not reuploaded?
+	err = processUpload(bs, &keys, "testdata", "")
+
+	filesInBucket, err := getFileList(bs, &keys, "")
+
+	sort.Strings(filesInBucket)
+	assert.EqualValues(t, expectedOutput, filesInBucket)
 }

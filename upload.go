@@ -9,7 +9,6 @@ import (
 	"strings"
 
 	"github.com/GregorioDiStefano/gcloud-fuse/simplecrypto"
-	_ "github.com/GregorioDiStefano/go-file-storage/log"
 	"github.com/Sirupsen/logrus"
 )
 
@@ -24,6 +23,7 @@ func doesFileExist(uploadPath string, existingFilesMap map[string]string, keys *
 	plainTextUploadPath, _ := decryptFilePath(uploadPath, keys)
 	for plainTextRemotePath := range existingFilesMap {
 		if plainTextUploadPath == plainTextRemotePath {
+			log.Debug("this file already exists..")
 			return errors.New(fileAlreadyExistsError)
 		}
 	}
@@ -85,14 +85,14 @@ func doUpload(bs *bucketService, keys *simplecrypto.Keys, uploadFile, remoteDire
 
 	log.WithFields(logrus.Fields{"filename": uploadFile}).Debug("Starting encryption of file.")
 	encryptedFile, md5Hash, err := simplecrypto.EncryptFile(uploadFile, keys)
-
+	defer os.Remove(encryptedFile)
 	if err != nil {
 		panic(err)
 	}
 
 	log.WithFields(logrus.Fields{"filename": uploadFile}).Debug("Encryption of file complete.")
-
 	log.WithFields(logrus.Fields{"filename": uploadFile, "remoteDirectory": remoteDirectory}).Info("Uploading file")
+	fmt.Println("encryptedFile:", encryptedFile)
 	return bs.uploadToBucket(encryptedFile, keys, md5Hash, encryptedPath)
 }
 
