@@ -146,7 +146,7 @@ func EncryptFile(filename string, keys *Keys) (string, []byte, error) {
 	defer readFile.Close()
 
 	if err != nil {
-		log.Fatal("error opening: ", readFile.Name())
+		log.Fatalf("error opening: %s, err: %s", filename, err.Error())
 		return "", nil, errors.New(unableToOpenFileReading)
 	}
 

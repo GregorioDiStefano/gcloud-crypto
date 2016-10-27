@@ -4,10 +4,11 @@ import (
 	"crypto/md5"
 	"errors"
 	"fmt"
-	"github.com/GregorioDiStefano/gcloud-fuse/simplecrypto"
 	"io"
 	"os"
 	"strings"
+
+	"github.com/GregorioDiStefano/gcloud-fuse/simplecrypto"
 )
 
 type decryptedToEncryptedFilePath map[string]string
@@ -21,7 +22,7 @@ func isStringInSlice(s string, list []string) bool {
 	return false
 }
 
-func getDecryptedToEncryptedFileMapping(encryptedFilePaths []string, key []byte) decryptedToEncryptedFilePath {
+func getDecryptedToEncryptedFileMapping(encryptedFilePaths []string, key *simplecrypto.Keys) decryptedToEncryptedFilePath {
 	m := make(decryptedToEncryptedFilePath, len(encryptedFilePaths))
 	for _, e := range encryptedFilePaths {
 		plainTextFilepath, err := decryptFilePath(e, key)
@@ -36,12 +37,12 @@ func getDecryptedToEncryptedFileMapping(encryptedFilePaths []string, key []byte)
 	return m
 }
 
-func encryptFilePath(path string, key []byte) string {
+func encryptFilePath(path string, key *simplecrypto.Keys) string {
 	splitPath := strings.Split(path, "/")
 	var encryptedPath []string
 
 	for _, e := range splitPath {
-		encText, _ := simplecrypto.EncryptText(e, key)
+		encText, _ := simplecrypto.EncryptText(e, key.EncryptionKey)
 		encryptedPath = append(encryptedPath, encText)
 	}
 
@@ -49,12 +50,14 @@ func encryptFilePath(path string, key []byte) string {
 	return entireEncryptedPath
 }
 
-func decryptFilePath(encryptedPath string, key []byte) (string, error) {
+func decryptFilePath(encryptedPath string, key *simplecrypto.Keys) (string, error) {
 	splitPath := strings.Split(encryptedPath, "/")
 	decryptedPath := []string{}
 
 	for _, e := range splitPath {
-		if t, err := simplecrypto.DecryptText(e, key); err == nil {
+		if e == PASSWORD_CHECK_FILE {
+			continue
+		} else if t, err := simplecrypto.DecryptText(e, key.EncryptionKey); err == nil {
 			decryptedPath = append(decryptedPath, t)
 		} else {
 			return "", errors.New("failed to decrypt file: " + encryptedPath)

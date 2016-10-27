@@ -7,21 +7,22 @@ import (
 	"strings"
 
 	"github.com/GregorioDiStefano/gcloud-fuse/simplecrypto"
+	_ "github.com/GregorioDiStefano/go-file-storage/log"
 	"github.com/Sirupsen/logrus"
 	"github.com/ryanuber/go-glob"
 )
 
-func (bs *bucketService) doMoveObject(keys simplecrypto.Keys, src, dst string) error {
+func (bs *bucketService) doMoveObject(keys *simplecrypto.Keys, src, dst string) error {
 	objects, err := bs.getObjects()
 
 	if err != nil {
 		return errors.New("failed getting objects: " + err.Error())
 	}
 
-	isGlob := strings.Contains(src, "*")
-	isDestinationFolder := strings.HasSuffix(dst, "/")
+	isGlob := strings.HasSuffix(src, "*")
+	//isDestinationFolder := strings.HasSuffix(dst, "/")
 
-	decToEncPaths := getDecryptedToEncryptedFileMapping(objects, keys.EncryptionKey)
+	decToEncPaths := getDecryptedToEncryptedFileMapping(objects, keys)
 	for plaintextFilename := range decToEncPaths {
 		var finalDst string
 		if glob.Glob(src, plaintextFilename) {
@@ -31,13 +32,19 @@ func (bs *bucketService) doMoveObject(keys simplecrypto.Keys, src, dst string) e
 				return fmt.Errorf("file: %s not found in bucket", src)
 			}
 
-			if isGlob || isDestinationFolder {
+			// destination is always a folder when you are copy a set of files
+			if isGlob {
 				// copy all the files to the dst 'folder'
+				srcWithoutWildcard := strings.Trim(src, "*")
+				if strings.HasPrefix(plaintextFilename, filepath.Dir(srcWithoutWildcard)) {
+					fmt.Println(srcWithoutWildcard, plaintextFilename)
+					finalDst = filepath.Clean(dst + "/" + strings.TrimPrefix(plaintextFilename, filepath.Dir(srcWithoutWildcard)))
+				}
+			} else {
 				finalDst = filepath.Clean(dst + "/" + plaintextFilename)
-				fmt.Println(finalDst)
 			}
 
-			finalDstEncrypted := encryptFilePath(finalDst, keys.EncryptionKey)
+			finalDstEncrypted := encryptFilePath(finalDst, keys)
 			if err := bs.moveObject(encryptedFilename, finalDstEncrypted); err != nil {
 				return err
 			}

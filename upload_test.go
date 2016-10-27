@@ -53,6 +53,9 @@ func tearDown(bs *bucketService) {
 	for _, e := range objs {
 		bs.deleteObject(e)
 	}
+
+	// changes are sometimes not reflected
+	time.Sleep(3 * time.Second)
 }
 
 func randomFile() string {
@@ -113,7 +116,7 @@ func TestDoUpload(t *testing.T) {
 		path := e.uploadFilepath
 		remoteDirectory := e.destinationDirectory
 
-		err := processUpload(bs, keys, path, remoteDirectory)
+		err := processUpload(bs, &keys, path, remoteDirectory)
 
 		if err != nil {
 			log.Debug("Error uploading: ", err)
@@ -124,7 +127,7 @@ func TestDoUpload(t *testing.T) {
 		time.Sleep(3 * time.Second)
 
 		if e.expectedError == nil {
-			filesInBucket, err := getFileList(bs, keys.EncryptionKey, "")
+			filesInBucket, err := getFileList(bs, &keys, "")
 			assert.Nil(t, err)
 			assert.Equal(t, filesInBucket, e.expectedStructure)
 		}
@@ -132,7 +135,7 @@ func TestDoUpload(t *testing.T) {
 		if e.expectedStructure != nil {
 			cwd, _ := os.Getwd()
 			tempDir, _ := ioutil.TempDir(cwd, "testrun")
-			err := doDownload(bs, keys, "*", tempDir)
+			err := doDownload(bs, &keys, "*", tempDir)
 			assert.Nil(t, err)
 			switch e.srcType {
 			case "file":
@@ -164,14 +167,14 @@ func TestDoUploadResume(t *testing.T) {
 
 	defer tearDown(bs)
 
-	err := processUpload(bs, keys, "testdata/testdata1", "")
+	err := processUpload(bs, &keys, "testdata/testdata1", "")
 	assert.Nil(t, err)
 
 	// how to actually check the file was not reuploaded?
-	err = processUpload(bs, keys, "testdata/testdata*", "")
+	err = processUpload(bs, &keys, "testdata/testdata*", "")
 	assert.Equal(t, err.Error(), fileUploadFailError)
 
-	filesInBucket, err := getFileList(bs, keys.EncryptionKey, "")
+	filesInBucket, err := getFileList(bs, &keys, "")
 	assert.Equal(t, []string{
 		"/testdata/testdata1",
 		"/testdata/testdata2",

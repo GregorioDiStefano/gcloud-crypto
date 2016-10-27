@@ -8,30 +8,44 @@ import (
 
 func TestDoMove(t *testing.T) {
 	bs, keys := setupUp()
-	defer tearDown(bs)
 
+	defer tearDown(bs)
+	tearDown(bs)
+
+	//TODO: add error tests
 	moveTests := []struct {
 		src               string
 		dst               string
 		expectedStructure []string
 	}{
+		{"testdata/nested_1/*", "move/", []string{
+			"move/nested_nested_1/nested_nested_nested_1/testdata1",
+			"move/nested_nested_1/testdata1",
+			"move/testdata1"}},
 		{"testdata/testdata*", "dst/", []string{
-			"dst/testdata/testdata1",
-			"dst/testdata/testdata2",
-			"dst/testdata/testdata3",
-			"dst/testdata/testdata4",
-			"dst/testdata/testdata5",
-			"dst/testdata/testdata6"}},
+			"dst/testdata1",
+			"dst/testdata2",
+			"dst/testdata3",
+			"dst/testdata4",
+			"dst/testdata5",
+			"dst/testdata6"}},
+		{"testdata/testdata1", "abc/", []string{
+			"abc/testdata/testdata1"}},
+		{"testdata/nested_1/*", "new_dir/", []string{
+			"new_dir/nested_nested_1/nested_nested_nested_1/testdata1",
+			"new_dir/nested_nested_1/testdata1",
+			"new_dir/testdata1"}},
 	}
 
 	for _, e := range moveTests {
-		err := processUpload(bs, keys, e.src, "")
+		err := processUpload(bs, &keys, e.src, "")
 		assert.Nil(t, err)
 
-		bs.doMoveObject(keys, "/"+e.src, e.dst)
+		bs.doMoveObject(&keys, "/"+e.src, e.dst)
 
-		getFileList(bs, keys.EncryptionKey, "")
-		filesInBucket, _ := getFileList(bs, keys.EncryptionKey, "")
+		getFileList(bs, &keys, "")
+		filesInBucket, _ := getFileList(bs, &keys, "")
 		assert.Equal(t, e.expectedStructure, filesInBucket)
+		tearDown(bs)
 	}
 }

@@ -9,7 +9,7 @@ import (
 	"github.com/ryanuber/go-glob"
 )
 
-func (bs *bucketService) doDeleteObject(keys simplecrypto.Keys, filepath string, encrypted bool) error {
+func (bs *bucketService) doDeleteObject(keys *simplecrypto.Keys, filepath string, encrypted bool) error {
 	objects, err := bs.getObjects()
 
 	if err != nil {
@@ -17,7 +17,7 @@ func (bs *bucketService) doDeleteObject(keys simplecrypto.Keys, filepath string,
 	}
 
 	if encrypted {
-		filepath, err = decryptFilePath(filepath, keys.EncryptionKey)
+		filepath, err = decryptFilePath(filepath, keys)
 	}
 
 	if err != nil {
@@ -31,7 +31,7 @@ func (bs *bucketService) doDeleteObject(keys simplecrypto.Keys, filepath string,
 		return errors.New("not perform destructive delete")
 	}
 
-	decToEncPaths := getDecryptedToEncryptedFileMapping(objects, keys.EncryptionKey)
+	decToEncPaths := getDecryptedToEncryptedFileMapping(objects, keys)
 	for plaintextFilename, _ := range decToEncPaths {
 
 		if glob.Glob(filepath, plaintextFilename) && plaintextFilename != PASSWORD_CHECK_FILE {

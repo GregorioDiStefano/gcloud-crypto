@@ -4,10 +4,11 @@ import (
 	"path/filepath"
 	"sort"
 
+	"github.com/GregorioDiStefano/gcloud-fuse/simplecrypto"
 	"github.com/ryanuber/go-glob"
 )
 
-func getDirList(bs *bucketService, key []byte, matchGlob string) ([]string, error) {
+func getDirList(bs *bucketService, key *simplecrypto.Keys , matchGlob string) ([]string, error) {
 	objects, err := bs.getObjects()
 	if err != nil {
 		return nil, err
@@ -33,7 +34,7 @@ func getDirList(bs *bucketService, key []byte, matchGlob string) ([]string, erro
 	return dirs, nil
 }
 
-func getFileList(bs *bucketService, key []byte, matchGlob string) ([]string, error) {
+func getFileList(bs *bucketService, key *simplecrypto.Keys, matchGlob string) ([]string, error) {
 	objects, err := bs.getObjects()
 	if err != nil {
 		return nil, err

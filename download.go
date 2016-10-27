@@ -11,7 +11,7 @@ import (
 	"github.com/ryanuber/go-glob"
 )
 
-func doDownload(bs *bucketService, keys simplecrypto.Keys, filename, destinationDir string) error {
+func doDownload(bs *bucketService, keys *simplecrypto.Keys, filename, destinationDir string) error {
 	objects, err := bs.getObjects()
 
 	if err != nil {
@@ -24,7 +24,7 @@ func doDownload(bs *bucketService, keys simplecrypto.Keys, filename, destination
 		}
 	}
 
-	decToEncPaths := getDecryptedToEncryptedFileMapping(objects, keys.EncryptionKey)
+	decToEncPaths := getDecryptedToEncryptedFileMapping(objects, keys)
 
 	foundFile := false
 	for plaintextFilename, _ := range decToEncPaths {
@@ -32,7 +32,7 @@ func doDownload(bs *bucketService, keys simplecrypto.Keys, filename, destination
 			foundFile = true
 
 			encryptedFilepath := decToEncPaths[plaintextFilename]
-			decryptedFilePath, _ := decryptFilePath(decToEncPaths[plaintextFilename], keys.EncryptionKey)
+			decryptedFilePath, _ := decryptFilePath(decToEncPaths[plaintextFilename], keys)
 			downloadedEncryptedFile, err := bs.downloadFromBucket(encryptedFilepath)
 
 			if err != nil {
@@ -41,7 +41,7 @@ func doDownload(bs *bucketService, keys simplecrypto.Keys, filename, destination
 
 			defer os.Remove(downloadedEncryptedFile)
 
-			downloadedPlaintextFile, err := simplecrypto.DecryptFile(downloadedEncryptedFile, &keys)
+			downloadedPlaintextFile, err := simplecrypto.DecryptFile(downloadedEncryptedFile, keys)
 			defer os.Remove(downloadedPlaintextFile)
 
 			if err != nil {

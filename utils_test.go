@@ -1,12 +1,12 @@
 package main
 
 import (
-	"crypto/aes"
 	"crypto/rand"
 	"io"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/GregorioDiStefano/gcloud-fuse/simplecrypto"
 )
 
 func randomByte(length int) []byte {
@@ -19,38 +19,25 @@ func randomByte(length int) []byte {
 	return b
 }
 
-func TestEncryptDecryptFilePath_1(t *testing.T) {
+func TestEncryptDecryptFilePath(t *testing.T) {
 	t.Parallel()
 
-	fakePath := "root/a/abc/def/a.txt"
-	key := randomByte(aes.BlockSize)
+	pathTest := []struct {
+		path string
+	}{
+		{"root/a/abc/def/a.txt"},
+		{"abc"},
+		{"/abc"},
+	}
 
-	encryptedPath := encryptFilePath(fakePath, key)
-	decryptedPath, _ := decryptFilePath(encryptedPath, key)
+	keys, err := simplecrypto.GetKeyFromPassphrase([]byte("testing"), []byte("salt1234"), 4096, 16, 1)
+	assert.Nil(t, err)	
+	
+	for _, e := range pathTest {
+			encryptedPath := encryptFilePath(e.path, keys)
+			decryptedPath, err := decryptFilePath(encryptedPath, keys)
 
-	assert.Equal(t, decryptedPath, fakePath)
-}
-
-func TestEncryptDecryptFilePath_2(t *testing.T) {
-	t.Parallel()
-
-	fakePath := "abc"
-	key := randomByte(aes.BlockSize)
-
-	encryptedPath := encryptFilePath(fakePath, key)
-	decryptedPath, _ := decryptFilePath(encryptedPath, key)
-
-	assert.Equal(t, decryptedPath, fakePath)
-}
-
-func TestEncryptDecryptFilePath_3(t *testing.T) {
-	t.Parallel()
-
-	fakePath := "/abc"
-	key := randomByte(aes.BlockSize)
-
-	encryptedPath := encryptFilePath(fakePath, key)
-	decryptedPath, _ := decryptFilePath(encryptedPath, key)
-
-	assert.Equal(t, decryptedPath, fakePath)
+			assert.Nil(t, err)
+			assert.Equal(t, decryptedPath, e.path)
+	}	
 }

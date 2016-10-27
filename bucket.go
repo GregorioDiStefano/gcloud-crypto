@@ -11,6 +11,7 @@ import (
 
 	"github.com/GregorioDiStefano/gcloud-fuse/simplecrypto"
 	"github.com/Sirupsen/logrus"
+
 	googleAPI "google.golang.org/api/googleapi"
 	storage "google.golang.org/api/storage/v1"
 )
@@ -66,7 +67,7 @@ func (bs bucketService) deleteObject(encryptedFilePath string) error {
 	return nil
 }
 
-func (bs bucketService) uploadToBucket(fileToUpload string, keys simplecrypto.Keys, expectedMD5Hash []byte, encryptedUploadPath string) error {
+func (bs bucketService) uploadToBucket(fileToUpload string, keys *simplecrypto.Keys, expectedMD5Hash []byte, encryptedUploadPath string) error {
 	var fileSize int64
 
 	object := &storage.Object{Name: encryptedUploadPath}

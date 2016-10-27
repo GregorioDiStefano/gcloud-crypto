@@ -26,10 +26,10 @@ func TestDoDeleteObject(t *testing.T) {
 	}
 
 	for _, e := range uploadTests {
-		if err := processUpload(bs, keys, e.uploadFilepath, e.destinationDirectory); err == nil {
-			bs.doDeleteObject(keys, e.destinationDirectory+"/"+e.uploadFilepath, false)
+		if err := processUpload(bs, &keys, e.uploadFilepath, e.destinationDirectory); err == nil {
+			bs.doDeleteObject(&keys, e.destinationDirectory+"/"+e.uploadFilepath, false)
 			time.Sleep(10 * time.Second)
-			fileList, err := getFileList(bs, keys.EncryptionKey, "")
+			fileList, err := getFileList(bs, &keys, "")
 			assert.Empty(t, fileList)
 			assert.Empty(t, err)
 		} else if err != nil {

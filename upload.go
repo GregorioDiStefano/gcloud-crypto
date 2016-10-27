@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/GregorioDiStefano/gcloud-fuse/simplecrypto"
+	_ "github.com/GregorioDiStefano/go-file-storage/log"
 	"github.com/Sirupsen/logrus"
 )
 
@@ -19,8 +20,8 @@ const (
 )
 
 // doesFileExist checks that the remote does not have the exact same path and filename already
-func doesFileExist(uploadPath string, existingFilesMap map[string]string, keys simplecrypto.Keys) error {
-	plainTextUploadPath, _ := decryptFilePath(uploadPath, keys.EncryptionKey)
+func doesFileExist(uploadPath string, existingFilesMap map[string]string, keys *simplecrypto.Keys) error {
+	plainTextUploadPath, _ := decryptFilePath(uploadPath, keys)
 	for plainTextRemotePath := range existingFilesMap {
 		if plainTextUploadPath == plainTextRemotePath {
 			return errors.New(fileAlreadyExistsError)
@@ -31,10 +32,10 @@ func doesFileExist(uploadPath string, existingFilesMap map[string]string, keys s
 
 // findExistingPath is an optimization: reuse already existing encrypted paths instead of
 // having the same encrypted path in different objects
-func findExistingPath(bs bucketService, keys simplecrypto.Keys, uploadDirectoryPath string) string {
+func findExistingPath(bs bucketService, keys *simplecrypto.Keys, uploadDirectoryPath string) string {
 	if objects, err := bs.getObjects(); err == nil {
 
-		decryptedToEncryptedFiles := getDecryptedToEncryptedFileMapping(objects, keys.EncryptionKey)
+		decryptedToEncryptedFiles := getDecryptedToEncryptedFileMapping(objects, keys)
 
 		for e := range decryptedToEncryptedFiles {
 			if filepath.Dir(e) == uploadDirectoryPath {
@@ -45,26 +46,18 @@ func findExistingPath(bs bucketService, keys simplecrypto.Keys, uploadDirectoryP
 	return ""
 }
 
-func doUpload(bs *bucketService, keys simplecrypto.Keys, uploadFile, remoteDirectory string) error {
-	encryptedFile, md5Hash, err := simplecrypto.EncryptFile(uploadFile, &keys)
+func doUpload(bs *bucketService, keys *simplecrypto.Keys, uploadFile, remoteDirectory string) error {
 	encryptedPath := ""
-
-	if err != nil {
-		panic(err)
-	}
-
-	log.WithFields(logrus.Fields{"filename": uploadFile}).Debug("Encryption of file complete.")
-
 	objects, err := bs.getObjects()
 
 	if err != nil {
 		panic(err)
 	}
 
-	decToEncPaths := getDecryptedToEncryptedFileMapping(objects, keys.EncryptionKey)
+	decToEncPaths := getDecryptedToEncryptedFileMapping(objects, keys)
 
 	if remoteDirectory == "" && filepath.Dir(uploadFile) == "." {
-		encryptedPath = encryptFilePath(uploadFile, keys.EncryptionKey)
+		encryptedPath = encryptFilePath(uploadFile, keys)
 	} else {
 
 		if strings.HasPrefix(remoteDirectory, "/") {
@@ -81,7 +74,7 @@ func doUpload(bs *bucketService, keys simplecrypto.Keys, uploadFile, remoteDirec
 				return err
 			}
 		} else {
-			encryptedPath = encryptFilePath(finalRemoteUploadPath, keys.EncryptionKey)
+			encryptedPath = encryptFilePath(finalRemoteUploadPath, keys)
 		}
 	}
 
@@ -90,11 +83,20 @@ func doUpload(bs *bucketService, keys simplecrypto.Keys, uploadFile, remoteDirec
 		return err
 	}
 
+	log.WithFields(logrus.Fields{"filename": uploadFile}).Debug("Starting encryption of file.")
+	encryptedFile, md5Hash, err := simplecrypto.EncryptFile(uploadFile, keys)
+
+	if err != nil {
+		panic(err)
+	}
+
+	log.WithFields(logrus.Fields{"filename": uploadFile}).Debug("Encryption of file complete.")
+
 	log.WithFields(logrus.Fields{"filename": uploadFile, "remoteDirectory": remoteDirectory}).Info("Uploading file")
 	return bs.uploadToBucket(encryptedFile, keys, md5Hash, encryptedPath)
 }
 
-func processUpload(bs *bucketService, keys simplecrypto.Keys, uploadPath, remoteDirectory string) error {
+func processUpload(bs *bucketService, keys *simplecrypto.Keys, uploadPath, remoteDirectory string) error {
 	globMatch, err := filepath.Glob(uploadPath)
 	errorOccured := false
 
@@ -111,7 +113,7 @@ func processUpload(bs *bucketService, keys simplecrypto.Keys, uploadPath, remote
 		if isDir(path) {
 			err = filepath.Walk(path, func(walkPath string, info os.FileInfo, err error) error {
 				if !isDir(walkPath) {
-					return doUpload(bs, keys, walkPath, remoteDirectory)
+					doUpload(bs, keys, walkPath, remoteDirectory)
 				}
 				return nil
 			})
