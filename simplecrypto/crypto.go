@@ -154,7 +154,7 @@ func EncryptFile(filename string, keys *Keys) (string, []byte, error) {
 	pb := &progressBar{}
 
 	if readFileStat, err := readFile.Stat(); err != nil {
-		log.Fatalf("unable to stat file that is to be encrypted")
+		log.Error("unable to stat file that is to be encrypted")
 	} else {
 		readFileSize := readFileStat.Size()
 		pb.totalSize = readFileSize
@@ -165,14 +165,14 @@ func EncryptFile(filename string, keys *Keys) (string, []byte, error) {
 	defer readFile.Close()
 
 	if err != nil {
-		log.Fatalf("error opening: %s, err: %s", filename, err.Error())
+		log.Errorf("error opening: %s, err: %s", filename, err.Error())
 		return "", nil, errors.New(unableToOpenFileReading)
 	}
 
 	writeFile, err := os.OpenFile(outputFilename, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0600)
 
 	if err != nil {
-		log.Fatal("Unable to open file for writing: ", err.Error())
+		log.Error("Unable to open file for writing: ", err.Error())
 		return "", nil, err
 	}
 	defer writeFile.Close()
@@ -180,7 +180,7 @@ func EncryptFile(filename string, keys *Keys) (string, []byte, error) {
 	block, err := aes.NewCipher(keys.EncryptionKey)
 
 	if err != nil {
-		log.Fatal("Unable to initalize AES crypto cipher: ", err.Error())
+		log.Error("Unable to initalize AES crypto cipher: ", err.Error())
 		return "", nil, err
 	}
 
@@ -191,7 +191,7 @@ func EncryptFile(filename string, keys *Keys) (string, []byte, error) {
 	writeFile.Write(iv)
 
 	if _, err := io.Copy(writer, readFile); err != nil {
-		log.Fatal("error during crypto: " + err.Error())
+		log.Error("error during crypto: " + err.Error())
 		return "", nil, err
 	}
 
@@ -201,7 +201,7 @@ func EncryptFile(filename string, keys *Keys) (string, []byte, error) {
 		addHMACToFile(writeFile, hmac)
 		md5Hash.Write(hmac)
 	} else {
-		log.Fatal("Unable to add HMAC to file: ", err.Error())
+		log.Error("Unable to add HMAC to file: ", err.Error())
 		return "", nil, err
 	}
 
@@ -248,7 +248,7 @@ func DecryptFile(filename string, keys *Keys) (string, error) {
 	}
 
 	if actualHMAC, err := calculateHMAC(keys.HMACKey, iv, readFile); err != nil || !bytes.Equal(actualHMAC, expectedHMAC) {
-		log.Fatal("Failed to validate HMAC")
+		log.Error("Failed to validate HMAC")
 		return "", errors.New(hmacValidationFailed)
 	}
 

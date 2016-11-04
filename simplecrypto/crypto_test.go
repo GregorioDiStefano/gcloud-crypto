@@ -104,7 +104,7 @@ func TestEncryptDecryptText_2(t *testing.T) {
 }
 
 func TestEncryptDecryptFile(t *testing.T) {
-	//	t.Parallel()
+	t.Parallel()
 
 	const tempFile = "/tmp/plaintext-file"
 	encryptDecryptTests := []struct {
@@ -125,8 +125,6 @@ func TestEncryptDecryptFile(t *testing.T) {
 
 	for _, e := range encryptDecryptTests {
 		key, _ := GetKeyFromPassphrase(e.key, e.iv, 4096, 16, 1)
-
-		dataToEncrypt, _ := ioutil.ReadFile(e.filepath)
 		encryptedFilename, _, err := EncryptFile(e.filepath, key)
 
 		if e.expectedError != nil {
@@ -134,31 +132,21 @@ func TestEncryptDecryptFile(t *testing.T) {
 			return
 		}
 
+		dataToEncrypt, _ := ioutil.ReadFile(e.filepath)
 		encryptedDataBytes, err := ioutil.ReadFile(encryptedFilename)
-
-		if err != nil {
-			panic(err)
-		}
 
 		assert.True(t, len(encryptedDataBytes) == len(dataToEncrypt)+aes.BlockSize+sha256.Size, "Looks like the IV/HMAC is missing from the file?")
 
 		assert.NotEqual(t, encryptedDataBytes, dataToEncrypt)
 
 		plainTextFile, err := DecryptFile(encryptedFilename, key)
+		assert.Nil(t, err)
 		defer os.Remove(plainTextFile)
 
-		if err != nil {
-			panic(err)
-		}
-
 		decryptedDataBytes, err := ioutil.ReadFile(plainTextFile)
-
-		if err != nil {
-			panic(err)
-		}
+		assert.Nil(t, err)
 
 		assert.Equal(t, decryptedDataBytes, dataToEncrypt)
-
 	}
 
 }
@@ -269,7 +257,6 @@ func TestAddHMACToFile(t *testing.T) {
 	}{
 		{"test_data/test-add_hmac-1", bytes.Repeat([]byte{0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07}, 4), nil},
 		{"test_data/test-add_hmac-2", bytes.Repeat([]byte{0x07}, 4), nil},
-		{"test_data/404", bytes.Repeat([]byte{0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07}, 4), errors.New(unableToOpenFileWriting)},
 	}
 
 	for _, h := range addHMACTests {
