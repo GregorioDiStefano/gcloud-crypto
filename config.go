@@ -29,7 +29,7 @@ func saltStringToSHA256(salt string) []byte {
 func parseConfig() *userData {
 	viper.SetConfigType("yaml")
 	viper.SetConfigName("config")
-	viper.AddConfigPath("$HOME/.gcloud-fuse")
+	viper.AddConfigPath("$HOME/.gcloud-crypto")
 	viper.AddConfigPath(".")
 
 	if err := viper.ReadInConfig(); err != nil {
