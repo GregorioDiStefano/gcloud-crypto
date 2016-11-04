@@ -22,11 +22,11 @@ var log = logrus.New()
 
 func init() {
 	flag.Bool("i", false, "interactive mode")
+	flag.Bool("D", false, "debug mode")
 	flag.Bool("list", false, "list folders/files")
 	flag.String("delete", "", "delete object")
 	flag.String("download", "", "file to download to local disk")
 	flag.String("upload", "", "file to upload to cloud")
-
 	flag.String("dir", "", "directory to store uploaded file to")
 }
 
@@ -37,9 +37,13 @@ const (
 
 func main() {
 	flag.Parse()
-	log.Level = logrus.DebugLevel
 
 	userData := parseConfig()
+
+	if flag.Lookup("D").Value.String() == "true" {
+		log.Level = logrus.DebugLevel
+		log.Debug("Debug logging enabled")
+	}
 
 	fmt.Print("Password: ")
 
@@ -88,6 +92,7 @@ func main() {
 	} else {
 		parseCmdLine(bs, *cryptoKeys)
 	}
+
 	os.Exit(0)
 }
 

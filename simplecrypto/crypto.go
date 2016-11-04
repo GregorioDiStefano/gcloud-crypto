@@ -11,12 +11,12 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
+	"github.com/Sirupsen/logrus"
+	"golang.org/x/crypto/scrypt"
 	"io"
 	"io/ioutil"
 	"os"
-
-	"github.com/Sirupsen/logrus"
-	"golang.org/x/crypto/scrypt"
+	"strings"
 )
 
 var log = logrus.New()
@@ -126,21 +126,40 @@ func DecryptText(cryptoText string, key []byte) (string, error) {
 	return fmt.Sprintf("%s", plaintext), nil
 }
 
-/*
-// Nice for debugging, so leaving here
-func (pt passThrough) Write(p []byte) (n int, err error) {
-	fmt.Println("bytes: ", hex.EncodeToString(p), "\n")
-	return len(p), nil
+func (pg *progressBar) Write(b []byte) (n int, err error) {
+	pg.bytesRead = pg.bytesRead + int64(len(b))
+	percent := (float64(pg.bytesRead) / float64(pg.totalSize)) * 100
+
+	progress := strings.Repeat("=", int(percent)/2) + ">"
+	spaces := strings.Repeat(" ", 50-(int(percent)/2))
+
+	fmt.Print(fmt.Sprintf("Encrypting: %s %d%% (%d/%d)\r", progress+spaces, int(percent), pg.bytesRead, pg.totalSize))
+
+	if percent == 100 {
+		fmt.Println()
+	}
+
+	return len(b), nil
 }
 
-type passThrough struct {
+type progressBar struct {
 	io.Writer
+	bytesRead int64
+	totalSize int64
 }
-*/
 
 func EncryptFile(filename string, keys *Keys) (string, []byte, error) {
 	outputFilename := fmt.Sprintf("%s.%s", filename, "enc")
 	readFile, err := os.Open(filename)
+	pb := &progressBar{}
+
+	if readFileStat, err := readFile.Stat(); err != nil {
+		log.Fatalf("unable to stat file that is to be encrypted")
+	} else {
+		readFileSize := readFileStat.Size()
+		pb.totalSize = readFileSize
+	}
+
 	md5Hash := md5.New()
 
 	defer readFile.Close()
@@ -153,6 +172,7 @@ func EncryptFile(filename string, keys *Keys) (string, []byte, error) {
 	writeFile, err := os.OpenFile(outputFilename, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0600)
 
 	if err != nil {
+		log.Fatal("Unable to open file for writing: ", err.Error())
 		return "", nil, err
 	}
 	defer writeFile.Close()
@@ -160,14 +180,14 @@ func EncryptFile(filename string, keys *Keys) (string, []byte, error) {
 	block, err := aes.NewCipher(keys.EncryptionKey)
 
 	if err != nil {
+		log.Fatal("Unable to initalize AES crypto cipher: ", err.Error())
 		return "", nil, err
 	}
 
 	iv := generateRandomIV()
 	md5Hash.Write(iv)
 
-	writer := &cipher.StreamWriter{S: cipher.NewCTR(block, iv), W: io.MultiWriter(writeFile, md5Hash)}
-
+	writer := &cipher.StreamWriter{S: cipher.NewCTR(block, iv), W: io.MultiWriter(writeFile, md5Hash, pb)}
 	writeFile.Write(iv)
 
 	if _, err := io.Copy(writer, readFile); err != nil {
@@ -181,6 +201,7 @@ func EncryptFile(filename string, keys *Keys) (string, []byte, error) {
 		addHMACToFile(writeFile, hmac)
 		md5Hash.Write(hmac)
 	} else {
+		log.Fatal("Unable to add HMAC to file: ", err.Error())
 		return "", nil, err
 	}
 

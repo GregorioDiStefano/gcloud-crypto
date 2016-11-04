@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"errors"
+	"fmt"
 	"io/ioutil"
 	"os"
 	"os/exec"
@@ -36,7 +37,7 @@ func setupUp() (*bucketService, simplecrypto.Keys) {
 	}
 
 	userData := parseConfig()
-	userData.configFile.Set("bucket", "go-testing")
+	userData.configFile.Set("bucket", "go-testing-1")
 	userData.configFile.Set("project_id", "stuff-141918")
 
 	bs := NewBucketService(*service, "go-testing", "stuff-141918")
@@ -56,7 +57,8 @@ func tearDown(bs *bucketService) {
 	}
 
 	// changes are sometimes not reflected
-	time.Sleep(3 * time.Second)
+	bs.bucketCache.seenFiles = make(map[string]string, 100)
+	time.Sleep(2 * time.Second)
 }
 
 func randomFile() string {
@@ -65,9 +67,19 @@ func randomFile() string {
 	return tmpfile.Name()
 }
 
+func searchForString(slice []string, s string) bool {
+	for _, e := range slice {
+		if e == s {
+			return true
+		}
+	}
+	return false
+}
+
 func TestDoUpload(t *testing.T) {
 	bs, keys := setupUp()
 
+	tearDown(bs)
 	defer tearDown(bs)
 
 	randomFileTestFilename := randomFile()
@@ -82,7 +94,24 @@ func TestDoUpload(t *testing.T) {
 		expectedError     interface{}
 		expectedStructure []string
 	}{
-		{"testdata/*", "test1", true, "dir", nil, []string{
+		{"testdata/*", "test0", true, "dir", nil, []string{
+			"test0/testdata/nested_1/nested_nested_1/nested_nested_nested_1/testdata1",
+			"test0/testdata/nested_1/nested_nested_1/testdata1",
+			"test0/testdata/nested_1/testdata1",
+			"test0/testdata/nested_2/testdata2",
+			"test0/testdata/nested_3/testdata1",
+			"test0/testdata/nested_3/testdata2",
+			"test0/testdata/nested_3/testdata3",
+			"test0/testdata/nested_3/testdata4",
+			"test0/testdata/test_a/a",
+			"test0/testdata/test_b/b",
+			"test0/testdata/testdata1",
+			"test0/testdata/testdata2",
+			"test0/testdata/testdata3",
+			"test0/testdata/testdata4",
+			"test0/testdata/testdata5",
+			"test0/testdata/testdata6"}},
+		{"testdata/", "test1", true, "dir", nil, []string{
 			"test1/testdata/nested_1/nested_nested_1/nested_nested_nested_1/testdata1",
 			"test1/testdata/nested_1/nested_nested_1/testdata1",
 			"test1/testdata/nested_1/testdata1",
@@ -145,9 +174,13 @@ func TestDoUpload(t *testing.T) {
 				assert.Nil(t, err)
 			case "dir":
 				out, err := exec.Command("diff", "-r", "-q", filepath.Dir(e.uploadFilepath), tempDir+"/"+e.destinationDirectory+"/"+filepath.Dir(e.uploadFilepath)).Output()
+
+				fmt.Println(string(out))
 				assert.Empty(t, out)
+				if err != nil {
+					fmt.Println("err: ", err.Error())
+				}
 				assert.Nil(t, err)
-			case "glob":
 
 			}
 			os.RemoveAll(tempDir)
@@ -158,8 +191,9 @@ func TestDoUpload(t *testing.T) {
 			for _, e := range objs {
 				bs.deleteObject(e)
 			}
+			time.Sleep(2 * time.Second)
 		}
-
+		bs.bucketCache.seenFiles = make(map[string]string, 100)
 	}
 }
 
@@ -175,13 +209,15 @@ func TestDoUploadResume(t *testing.T) {
 	assert.Equal(t, err.Error(), fileUploadFailError)
 
 	filesInBucket, err := getFileList(bs, &keys, "")
+
+	assert.Nil(t, err)
 	assert.Equal(t, []string{
-		"/testdata/testdata1",
-		"/testdata/testdata2",
-		"/testdata/testdata3",
-		"/testdata/testdata4",
-		"/testdata/testdata5",
-		"/testdata/testdata6"}, filesInBucket)
+		"testdata/testdata1",
+		"testdata/testdata2",
+		"testdata/testdata3",
+		"testdata/testdata4",
+		"testdata/testdata5",
+		"testdata/testdata6"}, filesInBucket)
 }
 
 func TestDoUploadDirectoryAndResume(t *testing.T) {
@@ -189,22 +225,22 @@ func TestDoUploadDirectoryAndResume(t *testing.T) {
 	defer tearDown(bs)
 
 	expectedOutput := []string{
-		"/testdata/testdata1",
-		"/testdata/testdata2",
-		"/testdata/testdata3",
-		"/testdata/testdata4",
-		"/testdata/testdata5",
-		"/testdata/testdata6",
-		"/testdata/nested_1/nested_nested_1/nested_nested_nested_1/testdata1",
-		"/testdata/nested_1/nested_nested_1/testdata1",
-		"/testdata/nested_1/testdata1",
-		"/testdata/nested_2/testdata2",
-		"/testdata/nested_3/testdata1",
-		"/testdata/nested_3/testdata2",
-		"/testdata/nested_3/testdata3",
-		"/testdata/nested_3/testdata4",
-		"/testdata/test_a/a",
-		"/testdata/test_b/b",
+		"testdata/testdata1",
+		"testdata/testdata2",
+		"testdata/testdata3",
+		"testdata/testdata4",
+		"testdata/testdata5",
+		"testdata/testdata6",
+		"testdata/nested_1/nested_nested_1/nested_nested_nested_1/testdata1",
+		"testdata/nested_1/nested_nested_1/testdata1",
+		"testdata/nested_1/testdata1",
+		"testdata/nested_2/testdata2",
+		"testdata/nested_3/testdata1",
+		"testdata/nested_3/testdata2",
+		"testdata/nested_3/testdata3",
+		"testdata/nested_3/testdata4",
+		"testdata/test_a/a",
+		"testdata/test_b/b",
 	}
 
 	sort.Strings(expectedOutput)
@@ -219,4 +255,32 @@ func TestDoUploadDirectoryAndResume(t *testing.T) {
 
 	sort.Strings(filesInBucket)
 	assert.EqualValues(t, expectedOutput, filesInBucket)
+}
+
+func TestExistingDirectoriesReused(t *testing.T) {
+	bs, keys := setupUp()
+	defer tearDown(bs)
+
+	identicalRemoteDirectories := []string{}
+	identicalRemoteEncryptedDirectories := []string{}
+
+	processUpload(bs, &keys, "testdata", "testing-directories")
+
+	filesInBucket, err := getFileList(bs, &keys, "")
+	for _, e := range filesInBucket {
+		if !searchForString(identicalRemoteDirectories, filepath.Dir(e)) {
+			identicalRemoteDirectories = append(identicalRemoteDirectories, filepath.Dir(e))
+		}
+	}
+
+	encryptedFilesInBucket, err := bs.getObjects()
+	assert.Empty(t, err)
+
+	for _, e := range encryptedFilesInBucket {
+		if !searchForString(identicalRemoteEncryptedDirectories, filepath.Dir(e)) {
+			identicalRemoteEncryptedDirectories = append(identicalRemoteEncryptedDirectories, filepath.Dir(e))
+		}
+	}
+
+	assert.Equal(t, len(identicalRemoteEncryptedDirectories), len(identicalRemoteDirectories))
 }

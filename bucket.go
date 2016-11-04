@@ -28,6 +28,7 @@ type bucketService struct {
 type bucket struct {
 	name    string
 	project string
+	bucketCache
 }
 
 type BucketInteraction interface {
@@ -56,7 +57,7 @@ func (pt *PassThrough) Read(b []byte) (int, error) {
 }
 
 func NewBucketService(service storage.Service, bucketName, projectName string) *bucketService {
-	return &bucketService{service, bucket{bucketName, projectName}}
+	return &bucketService{service, bucket{bucketName, projectName, bucketCache{}}}
 }
 
 func (bs bucketService) deleteObject(encryptedFilePath string) error {
@@ -102,7 +103,7 @@ func (bs bucketService) uploadToBucket(fileToUpload string, keys *simplecrypto.K
 		}
 		log.WithFields(logrus.Fields{"filename": encryptedUploadPath}).Debug("Created object successfully.")
 	} else {
-		return errors.New("Failed to upload")
+		return err
 	}
 
 	return nil
@@ -150,6 +151,7 @@ func (bs bucketService) getObjects() ([]string, error) {
 		}
 		res, err := call.Do()
 		if err != nil {
+			log.Fatal("fatal error while getting object list: " + err.Error())
 			return nil, errors.New("failed to get objects in bucket")
 		}
 		for _, object := range res.Items {

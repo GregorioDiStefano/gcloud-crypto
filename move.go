@@ -19,11 +19,11 @@ func (bs *bucketService) doMoveObject(keys *simplecrypto.Keys, src, dst string) 
 	}
 
 	isGlob := strings.HasSuffix(src, "*")
-	//isDestinationFolder := strings.HasSuffix(dst, "/")
 
 	decToEncPaths := getDecryptedToEncryptedFileMapping(objects, keys)
 	for plaintextFilename := range decToEncPaths {
 		var finalDst string
+
 		if glob.Glob(src, plaintextFilename) {
 			encryptedFilename := decToEncPaths[plaintextFilename]
 
@@ -36,11 +36,11 @@ func (bs *bucketService) doMoveObject(keys *simplecrypto.Keys, src, dst string) 
 				// copy all the files to the dst 'folder'
 				srcWithoutWildcard := strings.Trim(src, "*")
 				if strings.HasPrefix(plaintextFilename, filepath.Dir(srcWithoutWildcard)) {
-					fmt.Println(srcWithoutWildcard, plaintextFilename)
-					finalDst = filepath.Clean(dst + "/" + strings.TrimPrefix(plaintextFilename, filepath.Dir(srcWithoutWildcard)))
+					finalDst = filepath.Clean(filepath.Join(dst, strings.TrimPrefix(plaintextFilename, filepath.Dir(srcWithoutWildcard))))
+					finalDst = strings.TrimPrefix(finalDst, "/")
 				}
 			} else {
-				finalDst = filepath.Clean(dst + "/" + plaintextFilename)
+				finalDst = filepath.Clean(filepath.Join(dst, plaintextFilename))
 			}
 
 			finalDstEncrypted := encryptFilePath(finalDst, keys)

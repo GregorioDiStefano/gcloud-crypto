@@ -41,7 +41,43 @@ func TestDoMove(t *testing.T) {
 		err := processUpload(bs, &keys, e.src, "")
 		assert.Nil(t, err)
 
-		bs.doMoveObject(&keys, "/"+e.src, e.dst)
+		err = bs.doMoveObject(&keys, e.src, e.dst)
+		assert.Nil(t, err)
+
+		getFileList(bs, &keys, "")
+		filesInBucket, _ := getFileList(bs, &keys, "")
+		assert.Equal(t, e.expectedStructure, filesInBucket)
+		tearDown(bs)
+	}
+}
+
+func TestTransativeMove(t *testing.T) {
+	bs, keys := setupUp()
+
+	defer tearDown(bs)
+	tearDown(bs)
+
+	moveTests := []struct {
+		src               string
+		dst1              string
+		dst2              string
+		expectedStructure []string
+	}{
+		{"testdata/nested_1/*", "move/", "/", []string{
+			"nested_nested_1/nested_nested_nested_1/testdata1",
+			"nested_nested_1/testdata1",
+			"testdata1"}},
+	}
+
+	for _, e := range moveTests {
+		err := processUpload(bs, &keys, e.src, "")
+		assert.Nil(t, err)
+
+		err = bs.doMoveObject(&keys, e.src, e.dst1)
+		assert.Nil(t, err)
+
+		err = bs.doMoveObject(&keys, e.dst1+"*", e.dst2)
+		assert.Nil(t, err)
 
 		getFileList(bs, &keys, "")
 		filesInBucket, _ := getFileList(bs, &keys, "")

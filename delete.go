@@ -25,9 +25,7 @@ func (bs *bucketService) doDeleteObject(keys *simplecrypto.Keys, filepath string
 	}
 
 	switch filepath {
-	case "*":
-	case "/*":
-	case "*/*":
+	case "*", "/*", "*/*":
 		return errors.New("not perform destructive delete")
 	}
 

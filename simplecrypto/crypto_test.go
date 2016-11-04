@@ -114,29 +114,27 @@ func TestEncryptDecryptFile(t *testing.T) {
 
 		expectedError error
 	}{
+		{[]byte("foobar"), []byte("longtestiv123456"), "test_data/test-encrypt_decrypt_0", nil},
 		{[]byte("foobar"), []byte("longtestiv123456"), "test_data/test-encrypt_decrypt_1", nil},
-		/*		{[]byte("foobar"), []byte("longtestiv123456"), "test_data/test-encrypt_decrypt_2", nil},
-				{[]byte("foobar"), []byte("longtestiv123456"), "test_data/test-encrypt_decrypt_3", nil},
-				{[]byte("foobar"), []byte("longtestiv123456"), "test_data/test-encrypt_decrypt_4", nil},
-				{[]byte("foobar"), []byte("longtestiv123456"), "test_data/test-encrypt_decrypt_5", nil},
-				{[]byte("foobar"), []byte("longtestiv123456"), "test_data/404", errors.New(unableToOpenFileReading)},*/
+		{[]byte("foobar"), []byte("longtestiv123456"), "test_data/test-encrypt_decrypt_2", nil},
+		{[]byte("foobar"), []byte("longtestiv123456"), "test_data/test-encrypt_decrypt_3", nil},
+		{[]byte("foobar"), []byte("longtestiv123456"), "test_data/test-encrypt_decrypt_4", nil},
+		{[]byte("foobar"), []byte("longtestiv123456"), "test_data/test-encrypt_decrypt_5", nil},
+		{[]byte("foobar"), []byte("longtestiv123456"), "test_data/404", errors.New(unableToOpenFileReading)},
 	}
 
 	for _, e := range encryptDecryptTests {
 		key, _ := GetKeyFromPassphrase(e.key, e.iv, 4096, 16, 1)
 
 		dataToEncrypt, _ := ioutil.ReadFile(e.filepath)
-		encryptedFilename, err := EncryptFile(e.filepath, key)
+		encryptedFilename, _, err := EncryptFile(e.filepath, key)
 
 		if e.expectedError != nil {
 			assert.Equal(t, e.expectedError, err)
 			return
 		}
 
-		fmt.Println("encrypted filename: ", encryptedFilename)
 		encryptedDataBytes, err := ioutil.ReadFile(encryptedFilename)
-
-		fmt.Println("encrypted bytes: ", hex.EncodeToString(encryptedDataBytes))
 
 		if err != nil {
 			panic(err)
@@ -275,14 +273,14 @@ func TestAddHMACToFile(t *testing.T) {
 	}
 
 	for _, h := range addHMACTests {
-
+		f, _ := os.Open(h.file)
 		if len(h.hmac) < 32 {
-			assert.Panics(t, func() { addHMACToFile(h.file, h.hmac) }, "Failed to panic")
+			assert.Panics(t, func() { addHMACToFile(f, h.hmac) }, "Failed to panic")
 		} else {
-			e := addHMACToFile(h.file, h.hmac)
+			e := addHMACToFile(f, h.hmac)
 
 			if h.err != nil {
-				assert.Equal(t, h.err, e, "Unexpected error returned")
+				assert.Equal(t, h.err.Error(), e, "Unexpected error returned")
 			}
 		}
 	}

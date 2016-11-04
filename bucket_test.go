@@ -2,7 +2,6 @@ package main
 
 import (
 	"errors"
-	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -21,8 +20,6 @@ func TestHashMismatch(t *testing.T) {
 
 	md5hash, _ := getFileMD5(randomFileTestFilename1)
 	err := bs.uploadToBucket(randomFileTestFilename1, &keys, md5hash, file1)
-	fmt.Print("files in bucket : ")
-	fmt.Println(getFileList(bs, &keys, ""))
 
 	err = bs.uploadToBucket(randomFileTestFilename2, &keys, []byte{0x00}, file2)
 	assert.Equal(t, err, errors.New(hashMismatchErr))
