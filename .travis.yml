@@ -3,8 +3,9 @@ install:
 - go get "github.com/stretchr/testify"
 - go get ./...
 before_script:
+- tar xvf config.tar
 - go vet ./...
 - go test -v ./...
 before_install:
 - openssl aes-256-cbc -K $encrypted_4e4ce833f09f_key -iv $encrypted_4e4ce833f09f_iv
-  -in google-storage-data.enc -out google-storage-data -d
+  -in config.tar.enc -out config.tar -d
