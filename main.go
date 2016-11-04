@@ -8,7 +8,7 @@ import (
 	"os"
 	"syscall"
 
-	"github.com/GregorioDiStefano/gcloud-fuse/simplecrypto"
+	"github.com/GregorioDiStefano/gcloud-crypto/simplecrypto"
 
 	"golang.org/x/crypto/ssh/terminal"
 	"golang.org/x/net/context"

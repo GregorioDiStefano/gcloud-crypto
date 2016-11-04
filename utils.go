@@ -8,7 +8,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/GregorioDiStefano/gcloud-fuse/simplecrypto"
+	"github.com/GregorioDiStefano/gcloud-crypto/simplecrypto"
 )
 
 type decryptedToEncryptedFilePath map[string]string

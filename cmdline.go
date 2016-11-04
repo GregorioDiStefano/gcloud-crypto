@@ -8,7 +8,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/GregorioDiStefano/gcloud-fuse/simplecrypto"
+	"github.com/GregorioDiStefano/gcloud-crypto/simplecrypto"
 	"github.com/chzyer/readline"
 	"github.com/mattn/go-shellwords"
 )
@@ -17,7 +17,7 @@ const (
 	invalidFormat   = "invalid command line"
 	invalidUpload   = "invalid upload request; try using 'upload <file>' or 'upload <file> <destination directroy>'"
 	invalidDownload = "invalid download request; try using 'download <file>' or 'download <file> <destination folder>'"
-	invalidMove = "invalid move request; try using 'move <file>' or 'move <file> <destination folder>'"
+	invalidMove     = "invalid move request; try using 'move <file>' or 'move <file> <destination folder>'"
 )
 
 var completer = readline.NewPrefixCompleter(
@@ -113,7 +113,7 @@ func interactiveMode(rl *readline.Instance, bs *bucketService, cryptoKeys simple
 			if srcFile, destination, err := getSrcDestString(cleanLine); err != nil {
 				returnedError = errors.New(invalidMove)
 			} else {
-				returnedError =  bs.doMoveObject(&cryptoKeys, srcFile, destination)
+				returnedError = bs.doMoveObject(&cryptoKeys, srcFile, destination)
 			}
 		case strings.HasPrefix(line, "exit"):
 			return

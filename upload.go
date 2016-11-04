@@ -7,7 +7,7 @@ import (
 	"path"
 	"path/filepath"
 
-	"github.com/GregorioDiStefano/gcloud-fuse/simplecrypto"
+	"github.com/GregorioDiStefano/gcloud-crypto/simplecrypto"
 	_ "github.com/GregorioDiStefano/go-file-storage/log"
 	"github.com/Sirupsen/logrus"
 )

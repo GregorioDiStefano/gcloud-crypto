@@ -13,7 +13,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/GregorioDiStefano/gcloud-fuse/simplecrypto"
+	"github.com/GregorioDiStefano/gcloud-crypto/simplecrypto"
 	"github.com/Sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"golang.org/x/oauth2/google"

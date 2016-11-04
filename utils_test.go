@@ -5,8 +5,8 @@ import (
 	"io"
 	"testing"
 
+	"github.com/GregorioDiStefano/gcloud-crypto/simplecrypto"
 	"github.com/stretchr/testify/assert"
-	"github.com/GregorioDiStefano/gcloud-fuse/simplecrypto"
 )
 
 func randomByte(length int) []byte {
@@ -31,13 +31,13 @@ func TestEncryptDecryptFilePath(t *testing.T) {
 	}
 
 	keys, err := simplecrypto.GetKeyFromPassphrase([]byte("testing"), []byte("salt1234"), 4096, 16, 1)
-	assert.Nil(t, err)	
-	
-	for _, e := range pathTest {
-			encryptedPath := encryptFilePath(e.path, keys)
-			decryptedPath, err := decryptFilePath(encryptedPath, keys)
+	assert.Nil(t, err)
 
-			assert.Nil(t, err)
-			assert.Equal(t, decryptedPath, e.path)
-	}	
+	for _, e := range pathTest {
+		encryptedPath := encryptFilePath(e.path, keys)
+		decryptedPath, err := decryptFilePath(encryptedPath, keys)
+
+		assert.Nil(t, err)
+		assert.Equal(t, decryptedPath, e.path)
+	}
 }

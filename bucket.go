@@ -9,7 +9,7 @@ import (
 	"os"
 	"time"
 
-	"github.com/GregorioDiStefano/gcloud-fuse/simplecrypto"
+	"github.com/GregorioDiStefano/gcloud-crypto/simplecrypto"
 	"github.com/Sirupsen/logrus"
 
 	googleAPI "google.golang.org/api/googleapi"
