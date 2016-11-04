@@ -44,6 +44,9 @@ func getFileList(bs *bucketService, key *simplecrypto.Keys, matchGlob string) ([
 
 	var keys []string
 	for k := range decToEncPaths {
+		if k == PASSWORD_CHECK_FILE {
+			continue
+		}
 		if len(matchGlob) > 0 && glob.Glob(matchGlob, k) {
 			keys = append(keys, k)
 		}
