@@ -1,25 +1,27 @@
 package main
 
 import (
-	"fmt"
-	"github.com/stretchr/testify/assert"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestDirsListing(t *testing.T) {
 	bs, keys := setupUp()
-	defer tearDown(bs)
+	tearDown(bs)
 
 	dirListTests := []struct {
 		uploadFilepath       string
 		destinationDirectory string
+		searchGlob           string
 
 		deleteAfterTest bool
 		expectedError   interface{}
 		expectedOutput  []string
 	}{
-		{"", "", true, nil, []string{}},
-		{"testdata/*", "", true, nil, []string{"testdata",
+		{"", "", "*", true, nil, []string{}},
+		{"testdata/*", "", "*", true, nil, []string{
+			"testdata",
 			"testdata/nested_1",
 			"testdata/nested_1/nested_nested_1",
 			"testdata/nested_1/nested_nested_1/nested_nested_nested_1",
@@ -28,7 +30,18 @@ func TestDirsListing(t *testing.T) {
 			"testdata/test_a",
 			"testdata/test_b",
 		}},
-		{"testdata/*", "abc", true, nil, []string{"testdata",
+		{"testdata/*", "abc", "*", true, nil, []string{
+			"abc/testdata",
+			"abc/testdata/nested_1",
+			"abc/testdata/nested_1/nested_nested_1",
+			"abc/testdata/nested_1/nested_nested_1/nested_nested_nested_1",
+			"abc/testdata/nested_2",
+			"abc/testdata/nested_3",
+			"abc/testdata/test_a",
+			"abc/testdata/test_b",
+		}},
+		{"testdata/", "abc", "abc/*", true, nil, []string{
+			"abc/testdata",
 			"abc/testdata/nested_1",
 			"abc/testdata/nested_1/nested_nested_1",
 			"abc/testdata/nested_1/nested_nested_1/nested_nested_nested_1",
@@ -45,9 +58,10 @@ func TestDirsListing(t *testing.T) {
 			assert.Nil(t, err)
 		}
 
-		dirsInBucket, err := getDirList(bs, &keys, "")
+		dirsInBucket, err := getDirList(bs, &keys, e.searchGlob)
 		assert.Nil(t, err)
 		assert.EqualValues(t, e.expectedOutput, dirsInBucket)
+		tearDown(bs)
 	}
 
 }
@@ -92,7 +106,6 @@ func TestFileListing(t *testing.T) {
 		}
 
 		filesInBucket, err := getFileList(bs, &keys, "")
-		fmt.Println("files: ", filesInBucket)
 		assert.Nil(t, err)
 		assert.EqualValues(t, e.expectedOutput, filesInBucket)
 	}
