@@ -8,7 +8,7 @@ import (
 
 func TestDirsListing(t *testing.T) {
 	bs, keys := setupUp()
-	tearDown(bs)
+	cleanUp(bs)
 
 	dirListTests := []struct {
 		uploadFilepath       string
@@ -61,14 +61,14 @@ func TestDirsListing(t *testing.T) {
 		dirsInBucket, err := getDirList(bs, &keys, e.searchGlob)
 		assert.Nil(t, err)
 		assert.EqualValues(t, e.expectedOutput, dirsInBucket)
-		tearDown(bs)
+		cleanUp(bs)
 	}
 
 }
 
 func TestFileListing(t *testing.T) {
 	bs, keys := setupUp()
-	defer tearDown(bs)
+	cleanUp(bs)
 
 	dirListTests := []struct {
 		uploadFilepath       string

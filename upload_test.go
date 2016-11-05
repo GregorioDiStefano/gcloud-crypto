@@ -50,7 +50,7 @@ func setupUp() (*bucketService, simplecrypto.Keys) {
 	return bs, *keys
 }
 
-func tearDown(bs *bucketService) {
+func cleanUp(bs *bucketService) {
 	objs, _ := bs.getObjects()
 	for _, e := range objs {
 		bs.deleteObject(e)
@@ -78,9 +78,7 @@ func searchForString(slice []string, s string) bool {
 
 func TestDoUpload(t *testing.T) {
 	bs, keys := setupUp()
-
-	tearDown(bs)
-	defer tearDown(bs)
+	cleanUp(bs)
 
 	randomFileTestFilename := randomFile()
 	defer os.Remove(randomFileTestFilename)
@@ -199,7 +197,7 @@ func TestDoUpload(t *testing.T) {
 
 func TestDoUploadResume(t *testing.T) {
 	bs, keys := setupUp()
-	defer tearDown(bs)
+	defer cleanUp(bs)
 
 	err := processUpload(bs, &keys, "testdata/testdata1", "")
 	assert.Nil(t, err)
@@ -222,7 +220,7 @@ func TestDoUploadResume(t *testing.T) {
 
 func TestDoUploadDirectoryAndResume(t *testing.T) {
 	bs, keys := setupUp()
-	defer tearDown(bs)
+	defer cleanUp(bs)
 
 	expectedOutput := []string{
 		"testdata/testdata1",
@@ -259,7 +257,7 @@ func TestDoUploadDirectoryAndResume(t *testing.T) {
 
 func TestExistingDirectoriesReused(t *testing.T) {
 	bs, keys := setupUp()
-	defer tearDown(bs)
+	defer cleanUp(bs)
 
 	identicalRemoteDirectories := []string{}
 	identicalRemoteEncryptedDirectories := []string{}

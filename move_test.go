@@ -8,9 +8,7 @@ import (
 
 func TestDoMove(t *testing.T) {
 	bs, keys := setupUp()
-
-	defer tearDown(bs)
-	tearDown(bs)
+	cleanUp(bs)
 
 	//TODO: add error tests
 	moveTests := []struct {
@@ -47,15 +45,13 @@ func TestDoMove(t *testing.T) {
 		getFileList(bs, &keys, "")
 		filesInBucket, _ := getFileList(bs, &keys, "")
 		assert.Equal(t, e.expectedStructure, filesInBucket)
-		tearDown(bs)
+		cleanUp(bs)
 	}
 }
 
 func TestTransativeMove(t *testing.T) {
 	bs, keys := setupUp()
-
-	defer tearDown(bs)
-	tearDown(bs)
+	cleanUp(bs)
 
 	moveTests := []struct {
 		src               string
@@ -82,6 +78,6 @@ func TestTransativeMove(t *testing.T) {
 		getFileList(bs, &keys, "")
 		filesInBucket, _ := getFileList(bs, &keys, "")
 		assert.Equal(t, e.expectedStructure, filesInBucket)
-		tearDown(bs)
+		cleanUp(bs)
 	}
 }

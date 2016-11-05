@@ -9,7 +9,7 @@ import (
 
 func TestDoDeleteObject(t *testing.T) {
 	bs, keys := setupUp()
-	defer tearDown(bs)
+	cleanUp(bs)
 
 	time.Sleep(3 * time.Second)
 

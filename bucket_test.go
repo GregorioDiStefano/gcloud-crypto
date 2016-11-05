@@ -9,7 +9,7 @@ import (
 
 func TestHashMismatch(t *testing.T) {
 	bs, keys := setupUp()
-	defer tearDown(bs)
+	cleanUp(bs)
 
 	getFileList(bs, &keys, "")
 	file1 := encryptFilePath("test0", &keys)
@@ -29,7 +29,7 @@ func TestHashMismatch(t *testing.T) {
 
 func TestMoveObject(t *testing.T) {
 	bs, keys := setupUp()
-	defer tearDown(bs)
+	cleanUp(bs)
 
 	srcFile := encryptFilePath("test0", &keys)
 	dstFile := encryptFilePath("dst", &keys)
