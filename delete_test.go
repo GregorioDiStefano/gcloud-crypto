@@ -11,8 +11,6 @@ func TestDoDeleteObject(t *testing.T) {
 	bs, keys := setupUp()
 	cleanUp(bs)
 
-	time.Sleep(3 * time.Second)
-
 	uploadTests := []struct {
 		uploadFilepath       string
 		destinationDirectory string
@@ -28,7 +26,6 @@ func TestDoDeleteObject(t *testing.T) {
 	for _, e := range uploadTests {
 		if err := processUpload(bs, &keys, e.uploadFilepath, e.destinationDirectory); err == nil {
 			bs.doDeleteObject(&keys, e.destinationDirectory+"/"+e.uploadFilepath, false)
-			time.Sleep(10 * time.Second)
 			fileList, err := getFileList(bs, &keys, "")
 			assert.Empty(t, fileList)
 			assert.Empty(t, err)
