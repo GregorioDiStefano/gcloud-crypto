@@ -38,7 +38,6 @@ func TestMoveObject(t *testing.T) {
 	md5hash, _ := getFileMD5(randomFileTestFilename)
 
 	bs.uploadToBucket(randomFileTestFilename, &keys, md5hash, srcFile)
-
 	bs.moveObject(srcFile, dstFile)
 
 	files, err := getFileList(bs, &keys, "")

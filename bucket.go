@@ -151,7 +151,7 @@ func (bs bucketService) getObjects() ([]string, error) {
 		}
 		res, err := call.Do()
 		if err != nil {
-			log.Fatal("fatal error while getting object list: " + err.Error())
+			log.Errorf("error while getting object list: " + err.Error())
 			return nil, errors.New("failed to get objects in bucket")
 		}
 		for _, object := range res.Items {

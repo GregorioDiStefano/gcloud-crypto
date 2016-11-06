@@ -20,7 +20,7 @@ func TestDirsListing(t *testing.T) {
 		expectedOutput  []string
 	}{
 		{"", "", "*", true, nil, []string{}},
-		{"testdata/*", "", "*", true, nil, []string{
+		{"testdata/", "", "*", true, nil, []string{
 			"testdata",
 			"testdata/nested_1",
 			"testdata/nested_1/nested_nested_1",
@@ -30,7 +30,7 @@ func TestDirsListing(t *testing.T) {
 			"testdata/test_a",
 			"testdata/test_b",
 		}},
-		{"testdata/*", "abc", "*", true, nil, []string{
+		{"testdata/", "abc", "*", true, nil, []string{
 			"abc/testdata",
 			"abc/testdata/nested_1",
 			"abc/testdata/nested_1/nested_nested_1",
@@ -79,7 +79,7 @@ func TestFileListing(t *testing.T) {
 		expectedOutput  []string
 	}{
 		{"", "", true, nil, nil},
-		{"testdata/*", "", true, nil, []string{
+		{"testdata/", "", true, nil, []string{
 			"testdata/nested_1/nested_nested_1/nested_nested_nested_1/testdata1",
 			"testdata/nested_1/nested_nested_1/testdata1",
 			"testdata/nested_1/testdata1",

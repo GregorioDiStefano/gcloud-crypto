@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"errors"
-	"fmt"
 	"io/ioutil"
 	"os"
 	"os/exec"
@@ -11,7 +10,6 @@ import (
 	"sort"
 	_ "strings"
 	"testing"
-	"time"
 
 	"github.com/GregorioDiStefano/gcloud-crypto/simplecrypto"
 	"github.com/Sirupsen/logrus"
@@ -50,15 +48,38 @@ func setupUp() (*bucketService, simplecrypto.Keys) {
 	return bs, *keys
 }
 
+func brokenSetupUp() (*bucketService, simplecrypto.Keys) {
+	client, err := google.DefaultClient(context.Background(), storage.DevstorageFullControlScope)
+
+	if err != nil {
+		log.Fatalf("Unable to get default client: %v", err)
+	}
+	service, err := storage.New(client)
+
+	if err != nil {
+		panic(err)
+	}
+
+	userData := parseConfig()
+	userData.configFile.Set("bucket", "bad")
+	userData.configFile.Set("project_id", "bad")
+
+	bs := NewBucketService(*service, "bad", "bad")
+	keys, err := simplecrypto.GetKeyFromPassphrase([]byte("testing"), []byte("salt1234"), 4096, 16, 1)
+
+	if err != nil {
+		panic(err)
+	}
+
+	return bs, *keys
+}
+
 func cleanUp(bs *bucketService) {
 	objs, _ := bs.getObjects()
 	for _, e := range objs {
 		bs.deleteObject(e)
 	}
-
-	// changes are sometimes not reflected
 	bs.bucketCache.seenFiles = make(map[string]string, 100)
-	time.Sleep(2 * time.Second)
 }
 
 func randomFile() string {
@@ -92,23 +113,23 @@ func TestDoUpload(t *testing.T) {
 		expectedError     interface{}
 		expectedStructure []string
 	}{
-		{"testdata/*", "test0", true, "dir", nil, []string{
-			"test0/testdata/nested_1/nested_nested_1/nested_nested_nested_1/testdata1",
-			"test0/testdata/nested_1/nested_nested_1/testdata1",
-			"test0/testdata/nested_1/testdata1",
-			"test0/testdata/nested_2/testdata2",
-			"test0/testdata/nested_3/testdata1",
-			"test0/testdata/nested_3/testdata2",
-			"test0/testdata/nested_3/testdata3",
-			"test0/testdata/nested_3/testdata4",
-			"test0/testdata/test_a/a",
-			"test0/testdata/test_b/b",
-			"test0/testdata/testdata1",
-			"test0/testdata/testdata2",
-			"test0/testdata/testdata3",
-			"test0/testdata/testdata4",
-			"test0/testdata/testdata5",
-			"test0/testdata/testdata6"}},
+		{"testdata/*", "test0", true, "globdir", nil, []string{
+			"test0/nested_1/nested_nested_1/nested_nested_nested_1/testdata1",
+			"test0/nested_1/nested_nested_1/testdata1",
+			"test0/nested_1/testdata1",
+			"test0/nested_2/testdata2",
+			"test0/nested_3/testdata1",
+			"test0/nested_3/testdata2",
+			"test0/nested_3/testdata3",
+			"test0/nested_3/testdata4",
+			"test0/test_a/a",
+			"test0/test_b/b",
+			"test0/testdata1",
+			"test0/testdata2",
+			"test0/testdata3",
+			"test0/testdata4",
+			"test0/testdata5",
+			"test0/testdata6"}},
 		{"testdata/", "test1", true, "dir", nil, []string{
 			"test1/testdata/nested_1/nested_nested_1/nested_nested_nested_1/testdata1",
 			"test1/testdata/nested_1/nested_nested_1/testdata1",
@@ -133,8 +154,8 @@ func TestDoUpload(t *testing.T) {
 			"test3/testdata/nested_3/testdata2",
 			"test3/testdata/nested_3/testdata3",
 			"test3/testdata/nested_3/testdata4"}},
-		{"testdata/nested_3/*1*", "test4", true, "", nil, []string{"test4/testdata/nested_3/testdata1"}},
-		{"testdata/test_*", "test5", true, "", nil, []string{"test5/testdata/test_a/a", "test5/testdata/test_b/b"}},
+		{"testdata/nested_3/*1*", "test4", true, "", nil, []string{"test4/testdata1"}},
+		{"testdata/test_*", "test5", true, "", nil, []string{"test5/test_a/a", "test5/test_b/b"}},
 		{randomFileTestFilename, "", true, "", nil, []string{randomFileTestFilename}},
 	}
 
@@ -152,12 +173,10 @@ func TestDoUpload(t *testing.T) {
 
 		assert.Equal(t, err, e.expectedError)
 
-		time.Sleep(3 * time.Second)
-
 		if e.expectedError == nil {
 			filesInBucket, err := getFileList(bs, &keys, "")
 			assert.Nil(t, err)
-			assert.Equal(t, filesInBucket, e.expectedStructure)
+			assert.EqualValues(t, filesInBucket, e.expectedStructure)
 		}
 
 		if e.expectedStructure != nil {
@@ -172,25 +191,22 @@ func TestDoUpload(t *testing.T) {
 				assert.Nil(t, err)
 			case "dir":
 				out, err := exec.Command("diff", "-r", "-q", filepath.Dir(e.uploadFilepath), tempDir+"/"+e.destinationDirectory+"/"+filepath.Dir(e.uploadFilepath)).Output()
-
-				fmt.Println(string(out))
 				assert.Empty(t, out)
-				if err != nil {
-					fmt.Println("err: ", err.Error())
-				}
 				assert.Nil(t, err)
-
+			case "globdir":
+				out, err := exec.Command("diff", "-r", "-q", filepath.Join(tempDir, e.destinationDirectory), filepath.Dir(e.uploadFilepath)).Output()
+				assert.Empty(t, out)
+				assert.Nil(t, err)
 			}
 			os.RemoveAll(tempDir)
 		}
 
 		if e.deleteAfterTest {
-			objs, _ := bs.getObjects()
-			for _, e := range objs {
-				bs.deleteObject(e)
-			}
-			time.Sleep(2 * time.Second)
+			cleanUp(bs)
+			objectsAfterDelete, _ := bs.getObjects()
+			assert.Empty(t, objectsAfterDelete, "Looks like objects still exist after deleting them all")
 		}
+
 		bs.bucketCache.seenFiles = make(map[string]string, 100)
 	}
 }
@@ -200,13 +216,15 @@ func TestDoUploadResume(t *testing.T) {
 	defer cleanUp(bs)
 
 	err := processUpload(bs, &keys, "testdata/testdata1", "")
+	filesInBucket, err := getFileList(bs, &keys, "")
 	assert.Nil(t, err)
+	assert.Equal(t, []string{"testdata/testdata1"}, filesInBucket)
 
 	// how to actually check the file was not reuploaded?
-	err = processUpload(bs, &keys, "testdata/testdata*", "")
+	err = processUpload(bs, &keys, "testdata/testdata*", "testdata/")
 	assert.Equal(t, err.Error(), fileUploadFailError)
 
-	filesInBucket, err := getFileList(bs, &keys, "")
+	filesInBucket, err = getFileList(bs, &keys, "")
 
 	assert.Nil(t, err)
 	assert.Equal(t, []string{

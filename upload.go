@@ -2,14 +2,13 @@ package main
 
 import (
 	"errors"
-	"fmt"
 	"os"
 	"path"
 	"path/filepath"
+	"strings"
 
 	"github.com/GregorioDiStefano/gcloud-crypto/simplecrypto"
 	_ "github.com/GregorioDiStefano/go-file-storage/log"
-	"github.com/Sirupsen/logrus"
 )
 
 const (
@@ -18,133 +17,126 @@ const (
 	fileUploadFailError    = "at least one file failed to upload"
 )
 
-// doesFileExist checks that the remote does not have the exact same path and filename already
-func doesFileExist(uploadPath string, existingFilesMap map[string]string, keys *simplecrypto.Keys) error {
-	plainTextUploadPath, _ := decryptFilePath(uploadPath, keys)
-	for plainTextRemotePath := range existingFilesMap {
-		if plainTextUploadPath == plainTextRemotePath {
-			log.Debugf("this file already exists remotely: %s", plainTextRemotePath)
-			return errors.New(fileAlreadyExistsError)
+func relativePathFromGlob(glob, match string) string {
+	splitGlob := strings.Split(glob, "/")
+	splitMatch := strings.Split(match, "/")
+	commonPath := ""
+	for i, s := range splitGlob {
+		if splitMatch[i] == s {
+			commonPath += s + "/"
+		} else {
+			break
 		}
 	}
-	return nil
+
+	return strings.TrimPrefix(match, commonPath)
 }
 
-// findExistingPath is an optimization: reuse already existing encrypted paths instead of
+// reuseExistingEncryptedPath is an optimization: reuse already existing encrypted paths instead of
 // having the same encrypted path in different objects
-func findExistingPath(bs bucketService, keys *simplecrypto.Keys, uploadDirectoryPath string) string {
+func reuseExistingEncryptedPath(bs bucketService, keys *simplecrypto.Keys, fullPlaintextRemoteUploadPath string) string {
 	for encryptedPath, decryptedPath := range bs.bucketCache.seenFiles {
-		if filepath.Dir(decryptedPath) == uploadDirectoryPath {
-			return encryptedPath
+		if filepath.Dir(decryptedPath) == filepath.Dir(fullPlaintextRemoteUploadPath) {
+			if encryptedFilename, err := simplecrypto.EncryptText(path.Base(fullPlaintextRemoteUploadPath), keys.EncryptionKey); err != nil {
+				return ""
+			} else {
+				return filepath.Clean(filepath.Dir(encryptedPath) + "/" + encryptedFilename)
+			}
 		}
 	}
-
 	return ""
 }
 
-func doUpload(bs *bucketService, keys *simplecrypto.Keys, uploadFile, remoteDirectory string) error {
-	encryptedRemoteFilePath := ""
-	remoteUploadPath := ""
-	finalUploadPath := ""
+func globMatchWithDirectories(path string) []string {
+	globMatch, _ := filepath.Glob(path)
+	matches := []string{}
 
-	remoteUploadPath = filepath.Clean(filepath.Join(remoteDirectory, filepath.Dir(uploadFile), filepath.Base(uploadFile)))
-	remoteUploadDirectoryPath := filepath.Dir(remoteUploadPath)
+	for _, matchedPath := range globMatch {
+		filepath.Walk(matchedPath, func(matchedPath string, info os.FileInfo, err error) error {
+			if !isDir(matchedPath) {
+				matches = append(matches, matchedPath)
+			}
+			return nil
+		})
+	}
+	return matches
+}
 
-	if matchingDirectory := findExistingPath(*bs, keys, remoteUploadDirectoryPath); matchingDirectory != "" {
-		if encryptedFilename, err := simplecrypto.EncryptText(path.Base(uploadFile), keys.EncryptionKey); err != nil {
-			return err
-		} else {
-			encryptedRemoteFilePath = filepath.Clean(filepath.Dir(matchingDirectory) + "/" + encryptedFilename)
-		}
-	} else {
-		finalUploadPath = remoteUploadPath
-		encryptedRemoteFilePath = encryptFilePath(finalUploadPath, keys)
+func prepareAndDoUpload(bs *bucketService, uploadFile, remoteUploadPath string, keys *simplecrypto.Keys) error {
+	finalEncryptedUploadPath := ""
+	encryptedFile, md5Hash, err := simplecrypto.EncryptFile(uploadFile, keys)
+
+	if err != nil {
+		log.Error(err)
 	}
 
 	for e := range bs.bucketCache.seenFiles {
 		plaintextFilepath, err := decryptFilePath(e, keys)
 		if err != nil {
-			log.Infof("Unable to decrypt filepath: %s", e)
+			log.Errorf("Unable to decrypt filepath: %s", e)
 			continue
 		}
 		if plaintextFilepath == remoteUploadPath {
-			log.Debugf("this file already exists: %s", plaintextFilepath)
+			log.Infof("this file already exists: %s", plaintextFilepath)
 			return errors.New(fileAlreadyExistsError)
 		}
 	}
 
-	log.WithFields(logrus.Fields{"filename": uploadFile}).Debug("Starting encryption of file.")
-	encryptedFile, md5Hash, err := simplecrypto.EncryptFile(uploadFile, keys)
-	defer os.Remove(encryptedFile)
-
-	if err != nil {
-		panic(err)
+	if finalEncryptedUploadPath = reuseExistingEncryptedPath(*bs, keys, remoteUploadPath); finalEncryptedUploadPath == "" {
+		finalEncryptedUploadPath = encryptFilePath(remoteUploadPath, keys)
 	}
 
-	log.WithFields(logrus.Fields{"filename": uploadFile}).Debug("Encryption of file complete.")
-	log.WithFields(logrus.Fields{"filename": uploadFile, "remoteDirectory": remoteDirectory}).Info("Uploading file")
-
-	if err := bs.uploadToBucket(encryptedFile, keys, md5Hash, encryptedRemoteFilePath); err != nil {
+	if err := bs.uploadToBucket(encryptedFile, keys, md5Hash, finalEncryptedUploadPath); err != nil {
 		return err
 	}
 
-	bs.bucketCache.addFile(encryptedRemoteFilePath, remoteUploadPath)
+	bs.bucketCache.addFile(finalEncryptedUploadPath, remoteUploadPath)
 	return nil
 }
 
 func processUpload(bs *bucketService, keys *simplecrypto.Keys, uploadPath, remoteDirectory string) error {
-	defer os.Remove(uploadPath + ".enc")
-	defer bs.bucketCache.empty()
-	errorOccured := false
+	globMatches := globMatchWithDirectories(uploadPath)
+	errorOccuredWhileUploading := false
 
-	globMatch, err := filepath.Glob(uploadPath)
-
-	if err != nil {
-		return err
-	}
-
-	objects, err := bs.getObjects()
-
-	if err != nil {
-		return err
-	}
-
-	if len(globMatch) == 0 {
+	if len(globMatches) == 0 {
 		return errors.New(fileNotFoundError)
 	}
 
 	// cache the list of all files before we start uploading
+	objects, err := bs.getObjects()
+
+	if err != nil {
+		log.Fatal("Unable to load remote objects")
+		return err
+	}
+
 	for _, encryptedFile := range objects {
 		decryptedFile, _ := decryptFilePath(encryptedFile, keys)
 		bs.bucketCache.addFile(encryptedFile, decryptedFile)
 	}
 
-	for _, path := range globMatch {
-		fmt.Println("Uploading: " + path + " to " + remoteDirectory)
-		if isDir(path) {
-			err = filepath.Walk(path, func(walkPath string, info os.FileInfo, err error) error {
-				if !isDir(walkPath) {
-					doUpload(bs, keys, walkPath, remoteDirectory)
-				}
-				return nil
-			})
+	for _, fileToUpload := range globMatches {
+		newUploadDirectory := ""
+		if strings.Contains(uploadPath, "*") {
+			newUploadDirectory = filepath.Join(remoteDirectory, relativePathFromGlob(uploadPath, fileToUpload))
 		} else {
-			err = doUpload(bs, keys, path, remoteDirectory)
+			newUploadDirectory = filepath.Join(remoteDirectory, fileToUpload)
 		}
-
-		if err != nil {
-			errorOccured = true
-			switch err.Error() {
-			case fileAlreadyExistsError:
-				log.Info("file already exists, skipping upload.")
-			default:
-				log.Infof("failed with %s when uploading: %s", err.Error(), path)
-				return err
+		if err := prepareAndDoUpload(bs, fileToUpload, newUploadDirectory, keys); err != nil {
+			if err != nil {
+				errorOccuredWhileUploading = true
+				switch err.Error() {
+				case fileAlreadyExistsError:
+					log.Info("file already exists, skipping upload.")
+				default:
+					log.Infof("failed with %s when uploading: %s", err.Error(), fileToUpload)
+					return err
+				}
 			}
 		}
 	}
 
-	if errorOccured {
+	if errorOccuredWhileUploading {
 		return errors.New(fileUploadFailError)
 	}
 

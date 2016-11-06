@@ -155,6 +155,7 @@ func EncryptFile(filename string, keys *Keys) (string, []byte, error) {
 
 	if readFileStat, err := readFile.Stat(); err != nil {
 		log.Error("unable to stat file that is to be encrypted")
+		return "", nil, err
 	} else {
 		readFileSize := readFileStat.Size()
 		pb.totalSize = readFileSize

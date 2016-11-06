@@ -105,30 +105,3 @@ func getFileMD5(filePath string) ([]byte, error) {
 
 	return hash.Sum(result), nil
 }
-
-/*
-func findCommonPath(path1, path2 string) string {
-	path1 = filepath.Clean(path1)
-	path2 = filepath.Clean(path2)
-
-	splitPath1 := strings.Split(path1, "/")
-	splitPath2 := strings.Split(path2, "/")
-	commonPath := ""
-
-	for i, e := range splitPath1 {
-		if splitPath2[i] == e {
-			if len(e) > 0 {
-				commonPath += e + "/"
-			}
-
-		} else {
-			break
-		}
-	}
-	commonPath = filepath.Clean(commonPath)
-	if commonPath == "." {
-		return ""
-	}
-	return filepath.Clean(commonPath) + "/"
-}
-*/
