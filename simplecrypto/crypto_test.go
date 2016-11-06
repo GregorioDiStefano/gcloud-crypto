@@ -120,7 +120,6 @@ func TestEncryptDecryptFile(t *testing.T) {
 		{[]byte("foobar"), []byte("longtestiv123456"), "test_data/test-encrypt_decrypt_3", nil},
 		{[]byte("foobar"), []byte("longtestiv123456"), "test_data/test-encrypt_decrypt_4", nil},
 		{[]byte("foobar"), []byte("longtestiv123456"), "test_data/test-encrypt_decrypt_5", nil},
-		{[]byte("foobar"), []byte("longtestiv123456"), "test_data/404", errors.New(unableToOpenFileReading)},
 	}
 
 	for _, e := range encryptDecryptTests {
