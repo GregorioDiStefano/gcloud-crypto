@@ -64,11 +64,6 @@ func globMatchWithDirectories(path string) []string {
 
 func prepareAndDoUpload(bs *bucketService, uploadFile, remoteUploadPath string, keys *simplecrypto.Keys) error {
 	finalEncryptedUploadPath := ""
-	encryptedFile, md5Hash, err := simplecrypto.EncryptFile(uploadFile, keys)
-
-	if err != nil {
-		log.Error(err)
-	}
 
 	for e := range bs.bucketCache.seenFiles {
 		plaintextFilepath, err := decryptFilePath(e, keys)
@@ -80,6 +75,12 @@ func prepareAndDoUpload(bs *bucketService, uploadFile, remoteUploadPath string, 
 			log.Infof("this file already exists: %s", plaintextFilepath)
 			return errors.New(fileAlreadyExistsError)
 		}
+	}
+
+	encryptedFile, md5Hash, err := simplecrypto.EncryptFile(uploadFile, keys)
+
+	if err != nil {
+		log.Error(err)
 	}
 
 	if finalEncryptedUploadPath = reuseExistingEncryptedPath(*bs, keys, remoteUploadPath); finalEncryptedUploadPath == "" {
