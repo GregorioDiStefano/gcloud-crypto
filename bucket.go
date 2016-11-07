@@ -69,11 +69,11 @@ func (bs bucketService) deleteObject(encryptedFilePath string) error {
 }
 
 func (bs bucketService) uploadToBucket(fileToUpload string, keys *simplecrypto.Keys, expectedMD5Hash []byte, encryptedUploadPath string) error {
-	var fileSize int64
+	defer os.Remove(fileToUpload)
+	fileSize := int64(0)
 
 	object := &storage.Object{Name: encryptedUploadPath}
 	file, err := os.Open(fileToUpload)
-	defer os.Remove(fileToUpload)
 
 	if err != nil {
 		return errors.New("Failed opening file: " + fileToUpload + ", error: " + err.Error())
@@ -95,7 +95,7 @@ func (bs bucketService) uploadToBucket(fileToUpload string, keys *simplecrypto.K
 		progress := strings.Repeat("=", (int(percent)/2)) + ">"
 		spaces := strings.Repeat(" ", 50-(int(percent)/2))
 
-		fmt.Print(fmt.Sprintf("%s: %s %d%% (%d/%d)\r", "Uploading", progress+spaces, int(percent), current, fileSize))
+		fmt.Print(fmt.Sprintf("%s:\t%s %d%% (%d/%d)\r", "Uploading", progress+spaces, int(percent), current, fileSize))
 
 		if percent == 100 {
 			fmt.Println()
