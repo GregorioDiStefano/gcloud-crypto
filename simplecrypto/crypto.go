@@ -312,5 +312,7 @@ func addHMACToFile(file *os.File, hmac []byte) error {
 	}
 
 	file.Write(hmac)
+	file.Sync()
+
 	return nil
 }
