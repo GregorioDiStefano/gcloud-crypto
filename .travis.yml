@@ -6,6 +6,8 @@ before_script:
 - tar xvf config.tar
 - go vet ./...
 - go test -v -coverprofile=coverage.txt -covermode=atomic
+script:
+- VERSION=0.0.1 make build 
 before_install:
 - openssl aes-256-cbc -K $encrypted_4e4ce833f09f_key -iv $encrypted_4e4ce833f09f_iv
   -in config.tar.enc -out config.tar -d
