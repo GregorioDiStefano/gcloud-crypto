@@ -1,10 +1,8 @@
 package main
 
 import (
-	"testing"
-	"time"
-
 	"github.com/stretchr/testify/assert"
+	"testing"
 )
 
 func TestDoDeleteObject(t *testing.T) {
