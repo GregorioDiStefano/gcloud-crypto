@@ -4,12 +4,12 @@ import (
 	b64 "encoding/base64"
 	"errors"
 	"fmt"
+	"github.com/GregorioDiStefano/gcloud-crypto/progress"
 	"github.com/GregorioDiStefano/gcloud-crypto/simplecrypto"
 	"github.com/Sirupsen/logrus"
 	"io"
 	"io/ioutil"
 	"os"
-	"strings"
 	"time"
 
 	googleAPI "google.golang.org/api/googleapi"
@@ -52,7 +52,7 @@ var progresses []Progress
 func (pt *PassThrough) Read(b []byte) (int, error) {
 	c, err := pt.Reader.Read(b)
 	pt.totalRead += int64(c)
-	fmt.Printf("%.2f complete.\r", 100*float64(pt.totalRead)/float64(pt.contentLength))
+	progress.DrawProgress("Downloading", pt.totalRead, pt.contentLength)
 	return c, err
 }
 
@@ -91,15 +91,7 @@ func (bs bucketService) uploadToBucket(fileToUpload string, keys *simplecrypto.K
 
 	// TODO: what is total? why is it 0?
 	var pu googleAPI.ProgressUpdater = func(current, total int64) {
-		percent := (float64(current) / float64(fileSize)) * 100
-		progress := strings.Repeat("=", (int(percent)/2)) + ">"
-		spaces := strings.Repeat(" ", 50-(int(percent)/2))
-
-		fmt.Print(fmt.Sprintf("%s:\t%s %d%% (%d/%d)\r", "Uploading", progress+spaces, int(percent), current, fileSize))
-
-		if percent == 100 {
-			fmt.Println()
-		}
+		progress.DrawProgress("Uploading", current, fileSize)
 	}
 
 	if res, err := bs.service.Objects.Insert(bs.bucket.name, object).ProgressUpdater(pu).Media(file).Do(); err == nil {
