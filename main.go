@@ -4,10 +4,11 @@ import (
 	"errors"
 	"flag"
 	"fmt"
-	"github.com/GregorioDiStefano/gcloud-crypto/simplecrypto"
 	"io/ioutil"
 	"os"
 	"syscall"
+
+	"github.com/GregorioDiStefano/gcloud-crypto/simplecrypto"
 
 	"golang.org/x/crypto/ssh/terminal"
 	"golang.org/x/net/context"
@@ -101,9 +102,9 @@ func main() {
 	}
 
 	if flag.Lookup("i").Value.String() == "true" {
-		interactiveMode(rl, bs, *cryptoKeys)
+		interactiveMode(rl, bs, cryptoKeys)
 	} else {
-		parseCmdLine(bs, *cryptoKeys)
+		parseCmdLine(bs, cryptoKeys)
 	}
 
 	os.Exit(0)
