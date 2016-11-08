@@ -1,15 +1,17 @@
-language: go
+language: 
+ - go
 install:
-- go get "github.com/stretchr/testify"
-- go get ./...
+ - go get "github.com/stretchr/testify"
+ - go get ./...
 before_script:
-- tar xvf config.tar
-- go vet ./...
-- go test -v -coverprofile=coverage.txt -covermode=atomic
+ - tar xvf config.tar
+ # Can't use vet ./... due to an issue in the progress package
+ - go vet ./simplecrypto
+ - go vet .
+ - go test -v -coverprofile=coverage.txt -covermode=atomic
 script:
-- VERSION=0.0.1 make build 
+ - VERSION=0.0.1 make build 
 before_install:
-- openssl aes-256-cbc -K $encrypted_4e4ce833f09f_key -iv $encrypted_4e4ce833f09f_iv
-  -in config.tar.enc -out config.tar -d
+ - openssl aes-256-cbc -K $encrypted_4e4ce833f09f_key -iv $encrypted_4e4ce833f09f_iv -in config.tar.enc -out config.tar -d
 after_success:
-- bash <(curl -s https://codecov.io/bash)
+ - bash <(curl -s https://codecov.io/bash)
