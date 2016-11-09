@@ -18,10 +18,17 @@ import (
 	"github.com/Sirupsen/logrus"
 )
 
+var (
+	Version         string
+	BuildTime       string
+	CompilerVersion string
+)
+
 var log = logrus.New()
 
 func init() {
 	flag.Bool("i", false, "interactive mode")
+	flag.Bool("version", false, "debug mode")
 	flag.Bool("D", false, "debug mode")
 	flag.Bool("list", false, "list folders/files")
 	flag.String("delete", "", "delete object")
@@ -43,6 +50,13 @@ func main() {
 	if flag.Lookup("D").Value.String() == "true" {
 		log.Level = logrus.DebugLevel
 		log.Debug("Debug logging enabled")
+	}
+
+	if flag.Lookup("version").Value.String() == "true" {
+		log.Infof("Version: %s", Version)
+		log.Infof("Build date: %s", BuildTime)
+		log.Infof("Compiler version: %s", CompilerVersion)
+		os.Exit(0)
 	}
 
 	fmt.Print("Password: ")
@@ -88,9 +102,9 @@ func main() {
 	}
 
 	if flag.Lookup("i").Value.String() == "true" {
-		interactiveMode(rl, bs, *cryptoKeys)
+		interactiveMode(rl, bs, cryptoKeys)
 	} else {
-		parseCmdLine(bs, *cryptoKeys)
+		parseCmdLine(bs, cryptoKeys)
 	}
 
 	os.Exit(0)
