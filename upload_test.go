@@ -1,101 +1,16 @@
 package main
 
 import (
-	"context"
 	"errors"
 	"io/ioutil"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"sort"
-	_ "strings"
 	"testing"
 
-	"github.com/GregorioDiStefano/gcloud-crypto/simplecrypto"
-	"github.com/Sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
-	"golang.org/x/oauth2/google"
-	"google.golang.org/api/storage/v1"
 )
-
-func init() {
-	log.Level = logrus.DebugLevel
-}
-
-func setupUp() (*bucketService, simplecrypto.Keys) {
-	client, err := google.DefaultClient(context.Background(), storage.DevstorageFullControlScope)
-
-	if err != nil {
-		log.Fatalf("Unable to get default client: %v", err)
-	}
-	service, err := storage.New(client)
-
-	if err != nil {
-		panic(err)
-	}
-
-	userData := parseConfig()
-	userData.configFile.Set("bucket", "go-testing-1")
-	userData.configFile.Set("project_id", "stuff-141918")
-
-	bs := NewBucketService(*service, "go-testing", "stuff-141918")
-	keys, err := simplecrypto.GetKeyFromPassphrase([]byte("testing"), []byte("salt1234"), 4096, 16, 1)
-
-	if err != nil {
-		panic(err)
-	}
-
-	return bs, *keys
-}
-
-func brokenSetupUp() (*bucketService, simplecrypto.Keys) {
-	client, err := google.DefaultClient(context.Background(), storage.DevstorageFullControlScope)
-
-	if err != nil {
-		log.Fatalf("Unable to get default client: %v", err)
-	}
-	service, err := storage.New(client)
-
-	if err != nil {
-		panic(err)
-	}
-
-	userData := parseConfig()
-	userData.configFile.Set("bucket", "bad")
-	userData.configFile.Set("project_id", "bad")
-
-	bs := NewBucketService(*service, "bad", "bad")
-	keys, err := simplecrypto.GetKeyFromPassphrase([]byte("testing"), []byte("salt1234"), 4096, 16, 1)
-
-	if err != nil {
-		panic(err)
-	}
-
-	return bs, *keys
-}
-
-func cleanUp(bs *bucketService) {
-	objs, _ := bs.getObjects()
-	for _, e := range objs {
-		bs.deleteObject(e)
-	}
-	bs.bucketCache.seenFiles = make(map[string]string, 100)
-}
-
-func randomFile() string {
-	tmpfile, _ := ioutil.TempFile(".", "test")
-	tmpfile.Write([]byte("this is a test string"))
-	return tmpfile.Name()
-}
-
-func searchForString(slice []string, s string) bool {
-	for _, e := range slice {
-		if e == s {
-			return true
-		}
-	}
-	return false
-}
 
 func TestDoUpload(t *testing.T) {
 	bs, keys := setupUp()

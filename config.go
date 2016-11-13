@@ -4,6 +4,7 @@ import (
 	"crypto/sha256"
 	"fmt"
 
+	_ "github.com/GregorioDiStefano/go-file-storage/log"
 	"github.com/Sirupsen/logrus"
 	"github.com/spf13/viper"
 )
@@ -29,6 +30,7 @@ func saltStringToSHA256(salt string) []byte {
 func parseConfig() *userData {
 	viper.SetConfigType("yaml")
 	viper.SetConfigName("config")
+	viper.AddConfigPath(".gcloud-crypto-testing-config")
 	viper.AddConfigPath("$HOME/.gcloud-crypto")
 	viper.AddConfigPath(".")
 
