@@ -5,6 +5,7 @@ install:
 - go get ./...
 before_script:
 - tar xvf config.tar
+- go fmt ./...
 - go vet ./simplecrypto
 - go vet .
 - go test -v -coverprofile=coverage.txt -covermode=atomic
