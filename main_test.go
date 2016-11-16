@@ -3,21 +3,25 @@ package main
 import (
 	"context"
 	"encoding/base64"
-	"io/ioutil"
-	"strings"
-
 	"github.com/GregorioDiStefano/gcloud-crypto/simplecrypto"
 	"github.com/Sirupsen/logrus"
 	"golang.org/x/oauth2/google"
 	storage "google.golang.org/api/storage/v1"
+	"io/ioutil"
+	"strconv"
+	"strings"
+	"time"
 )
 
 const (
 	gcsProjectID = "gcloud-crypto-testing"
 )
 
+var testStartTime string
+
 func init() {
 	log.Level = logrus.DebugLevel
+	testStartTime = strconv.FormatInt(time.Now().Unix(), 10)
 }
 
 func setupUp() (*bucketService, simplecrypto.Keys) {
@@ -32,12 +36,13 @@ func setupUp() (*bucketService, simplecrypto.Keys) {
 		panic(err)
 	}
 
-	testingBucket := "gct" + strings.ToLower(base64.RawURLEncoding.EncodeToString(randomByte(32)))
+	testingBucketPrefix := "gct-" + testStartTime + "-"
+	testingBucket := testingBucketPrefix + strings.ToLower(base64.RawURLEncoding.EncodeToString(randomByte(4)))
 	bs := NewBucketService(*service, testingBucket, gcsProjectID)
 
 	existingBucketsObj, _ := service.Buckets.List(gcsProjectID).Do()
 	for _, b := range existingBucketsObj.Items {
-		if strings.HasPrefix(b.Name, "gct") {
+		if strings.HasPrefix(b.Name, testingBucketPrefix) {
 
 			objs, _ := NewBucketService(*service, b.Name, gcsProjectID).getObjects()
 			for _, e := range objs {

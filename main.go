@@ -111,8 +111,7 @@ func main() {
 }
 
 func verifyPassword(bs *bucketService, cryptoKeys simplecrypto.Keys) error {
-	const testString = PASSWORD_CHECK_STRING
-	testdata, err := simplecrypto.EncryptText(testString, cryptoKeys.EncryptionKey)
+	testdata, err := simplecrypto.EncryptText(PASSWORD_CHECK_STRING, cryptoKeys.EncryptionKey)
 
 	if err != nil {
 		return errors.New("unable to encrypt test string: " + err.Error())
