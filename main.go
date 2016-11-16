@@ -124,7 +124,7 @@ func verifyPassword(bs *bucketService, cryptoKeys simplecrypto.Keys) error {
 		return errors.New(fmt.Sprintf("failed to find a '%s' file, if this is a new bucket, create a file called '%s' containing: %s", PASSWORD_CHECK_FILE, PASSWORD_CHECK_FILE, testdata))
 	} else {
 		testfileBytes, _ := ioutil.ReadFile(testfile)
-		if plainText, err := simplecrypto.DecryptText(string(testfileBytes), cryptoKeys.EncryptionKey); err != nil || plainText != testString {
+		if plainText, err := simplecrypto.DecryptText(string(testfileBytes), cryptoKeys.EncryptionKey); err != nil || plainText != PASSWORD_CHECK_STRING {
 			return errors.New("failed to verify password: " + err.Error())
 		}
 	}
