@@ -27,6 +27,7 @@ var completer = readline.NewPrefixCompleter(
 	readline.PcItem("download"),
 	readline.PcItem("delete"),
 	readline.PcItem("list"),
+	readline.PcItem("ls"),
 	readline.PcItem("exit"),
 )
 
@@ -45,14 +46,17 @@ func setupReadline() (*readline.Instance, error) {
 func readString(line string) (string, error) {
 	if parsedLine, err := shellwords.Parse(line); err == nil && len(parsedLine) == 1 {
 		return parsedLine[0], nil
-	} else {
-		return "", errors.New(invalidFormat)
+	} else if len(parsedLine) == 0 {
+		return "", nil
 	}
+	return "", errors.New(invalidFormat)
 }
 
 func readSrcAndDstString(line string) (string, string, error) {
 	if parsedLine, err := shellwords.Parse(line); err == nil && len(parsedLine) == 2 {
 		return parsedLine[0], parsedLine[1], nil
+	} else if len(parsedLine) == 1 {
+		return parsedLine[0], "", nil
 	} else {
 		return "", "", errors.New(invalidFormat)
 	}
@@ -69,16 +73,28 @@ func parseInteractiveCommand(bs *bucketService, keys *simplecrypto.Keys, line st
 		} else {
 			returnedError = processUpload(bs, keys, src, dst)
 		}
-	case strings.HasPrefix(line, "ls"):
-		var fileList []string
-		matchGlob := strings.TrimSpace(strings.TrimLeft(line, "ls"))
-		if fileList, returnedError = getFileList(bs, keys, matchGlob); returnedError == nil {
+	case strings.HasPrefix(line, "ls") || strings.HasPrefix(line, "list"):
+		var (
+			fileList  []string
+			matchGlob string
+		)
+		if strings.HasPrefix(line, "ls") {
+			matchGlob = strings.TrimSpace(strings.TrimLeft(line, "ls"))
+		} else if strings.HasPrefix(line, "list") {
+			matchGlob = strings.TrimSpace(strings.TrimLeft(line, "list"))
+		}
+		if matchGlob, returnedError = readString(matchGlob); returnedError != nil {
+			return returnedError
+		} else if fileList, returnedError = getFileList(bs, keys, matchGlob); returnedError == nil {
 			enumeratePrint(fileList)
 		}
 	case strings.HasPrefix(line, "dirs"):
 		var dirList []string
 		matchGlob := strings.TrimSpace(strings.TrimLeft(line, "dirs"))
-		if dirList, returnedError = getDirList(bs, keys, matchGlob); returnedError == nil {
+		if matchGlob, returnedError = readString(matchGlob); returnedError != nil {
+			fmt.Println(returnedError, matchGlob)
+			return returnedError
+		} else if dirList, returnedError = getDirList(bs, keys, matchGlob); returnedError == nil {
 			enumeratePrint(dirList)
 		}
 	case strings.HasPrefix(line, "delete"):

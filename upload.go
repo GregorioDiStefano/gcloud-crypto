@@ -17,21 +17,6 @@ const (
 	fileUploadFailError    = "at least one file failed to upload"
 )
 
-func relativePathFromGlob(glob, match string) string {
-	splitGlob := strings.Split(glob, "/")
-	splitMatch := strings.Split(match, "/")
-	commonPath := ""
-	for i, s := range splitGlob {
-		if splitMatch[i] == s {
-			commonPath += s + "/"
-		} else {
-			break
-		}
-	}
-
-	return strings.TrimPrefix(match, commonPath)
-}
-
 // reuseExistingEncryptedPath is an optimization: reuse already existing encrypted paths instead of
 // having the same encrypted path in different objects
 func reuseExistingEncryptedPath(bs bucketService, keys *simplecrypto.Keys, fullPlaintextRemoteUploadPath string) string {

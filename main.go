@@ -45,8 +45,6 @@ const (
 func main() {
 	flag.Parse()
 
-	userData := parseConfig()
-
 	if flag.Lookup("D").Value.String() == "true" {
 		log.Level = logrus.DebugLevel
 		log.Debug("Debug logging enabled")
@@ -58,6 +56,8 @@ func main() {
 		log.Infof("Compiler version: %s", CompilerVersion)
 		os.Exit(0)
 	}
+
+	userData := parseConfig()
 
 	fmt.Print("Password: ")
 
