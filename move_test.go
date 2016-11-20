@@ -10,7 +10,8 @@ import (
 
 func TestDoMove(t *testing.T) {
 	bs, keys := setupUp()
-	cleanUp(bs)
+	c := &client{&keys, bs, bucketCache{}}
+	cleanUp(c)
 
 	//TODO: add error tests
 	moveTests := []struct {
@@ -44,28 +45,29 @@ func TestDoMove(t *testing.T) {
 			"abc/testdata1"}},
 	}
 
-	for c, e := range moveTests {
-		fmt.Println("Test #", c)
-		err := processUpload(bs, &keys, e.uploadSrc, e.uploadDst)
+	for n, e := range moveTests {
+		fmt.Println("Test #", n)
+		err := c.processUpload(e.uploadSrc, e.uploadDst)
 		assert.Nil(t, err)
 
-		err = bs.doMoveObject(&keys, e.moveSrc, e.moveDst)
+		err = c.doMoveObject(e.moveSrc, e.moveDst)
 		assert.Nil(t, err)
 
-		filesInBucket, _ := getFileList(bs, &keys, "")
+		filesInBucket, _ := c.getFileList("")
 		assert.Equal(t, e.expectedStructure, filesInBucket)
-		cleanUp(bs)
+		cleanUp(c)
 	}
 }
 
 func TestMovePartialDirectoryWithoutGlob(t *testing.T) {
 	bs, keys := setupUp()
-	cleanUp(bs)
+	c := &client{&keys, bs, bucketCache{}}
+	cleanUp(c)
 
-	err := processUpload(bs, &keys, "testdata/", "")
+	err := c.processUpload("testdata/", "")
 	assert.Nil(t, err)
 
-	err = bs.doMoveObject(&keys, "testdata/nested_3/", "testdata_moved/")
+	err = c.doMoveObject("testdata/nested_3/", "testdata_moved/")
 	assert.Nil(t, err)
 
 	expectedObjects := []string{
@@ -86,7 +88,7 @@ func TestMovePartialDirectoryWithoutGlob(t *testing.T) {
 		"testdata/testdata5",
 		"testdata/testdata6"}
 
-	filesInBucket, _ := getFileList(bs, &keys, "")
+	filesInBucket, _ := c.getFileList("")
 	sort.Strings(filesInBucket)
 	sort.Strings(expectedObjects)
 	assert.EqualValues(t, expectedObjects, filesInBucket)
@@ -94,12 +96,13 @@ func TestMovePartialDirectoryWithoutGlob(t *testing.T) {
 
 func TestMovePartialDirectoryWithGlob(t *testing.T) {
 	bs, keys := setupUp()
-	cleanUp(bs)
+	c := &client{&keys, bs, bucketCache{}}
+	cleanUp(c)
 
-	err := processUpload(bs, &keys, "testdata/", "")
+	err := c.processUpload("testdata/", "")
 	assert.Nil(t, err)
 
-	err = bs.doMoveObject(&keys, "testdata/nested_1/*", "/")
+	err = c.doMoveObject("testdata/nested_1/*", "/")
 	assert.Nil(t, err)
 
 	expectedObjects := []string{
@@ -120,7 +123,7 @@ func TestMovePartialDirectoryWithGlob(t *testing.T) {
 		"testdata/testdata5",
 		"testdata/testdata6"}
 
-	filesInBucket, _ := getFileList(bs, &keys, "")
+	filesInBucket, _ := c.getFileList("")
 	sort.Strings(filesInBucket)
 	sort.Strings(expectedObjects)
 	assert.EqualValues(t, expectedObjects, filesInBucket)
@@ -128,9 +131,10 @@ func TestMovePartialDirectoryWithGlob(t *testing.T) {
 
 func TestMoveInEmptyBucket(t *testing.T) {
 	bs, keys := setupUp()
-	cleanUp(bs)
+	c := &client{&keys, bs, bucketCache{}}
+	cleanUp(c)
 
-	err := bs.doMoveObject(&keys, "12345/*", "test/")
+	err := c.doMoveObject("12345/*", "test/")
 	assert.Error(t, err)
 }
 
@@ -148,14 +152,16 @@ func TestMoveOfNonExistingFile(t *testing.T) {
 
 func TestMoveFailGettingObjects(t *testing.T) {
 	bs, keys := brokenSetupUp()
-
-	err := bs.doMoveObject(&keys, "12345/*", "test/")
+	c := &client{&keys, bs, bucketCache{}}
+	err := c.doMoveObject("12345/*", "test/")
 	assert.Error(t, err)
 }
 
 func TestTransativeMove(t *testing.T) {
 	bs, keys := setupUp()
-	cleanUp(bs)
+	c := &client{&keys, bs, bucketCache{}}
+	cleanUp(c)
+	c.doMoveObject("12345/*", "test/")
 
 	moveTests := []struct {
 		uploadSrc                  string
@@ -188,25 +194,25 @@ func TestTransativeMove(t *testing.T) {
 	}
 
 	for _, e := range moveTests {
-		err := processUpload(bs, &keys, e.uploadSrc, e.uploadDst)
+		err := c.processUpload(e.uploadSrc, e.uploadDst)
 		assert.Nil(t, err)
 
-		filesInBucket, _ := getFileList(bs, &keys, "")
+		filesInBucket, _ := c.getFileList("")
 
-		err = bs.doMoveObject(&keys, e.src1, e.dst1)
-		getFileList(bs, &keys, "")
-		filesInBucket, _ = getFileList(bs, &keys, "")
+		err = c.doMoveObject(e.src1, e.dst1)
+		c.getFileList("")
+		filesInBucket, _ = c.getFileList("")
 		sort.Strings(filesInBucket)
 		sort.Strings(e.expectedStructureAfterDst1)
 		assert.EqualValues(t, e.expectedStructureAfterDst1, filesInBucket)
 		assert.Nil(t, err)
 
-		err = bs.doMoveObject(&keys, e.src2, e.dst2)
+		err = c.doMoveObject(e.src2, e.dst2)
 		assert.Nil(t, err)
 
-		getFileList(bs, &keys, "")
-		filesInBucket, _ = getFileList(bs, &keys, "")
+		c.getFileList("")
+		filesInBucket, _ = c.getFileList("")
 		assert.EqualValues(t, e.expectedStructureAfterDst2, filesInBucket)
-		cleanUp(bs)
+		cleanUp(c)
 	}
 }

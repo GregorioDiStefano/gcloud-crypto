@@ -8,32 +8,33 @@ import (
 
 func TestInteractiveMode(t *testing.T) {
 	bs, keys := setupUp()
-	cleanUp(bs)
+	c := &client{&keys, bs, bucketCache{}}
+	cleanUp(c)
 
 	rl, err := setupReadline()
 	assert.Nil(t, err)
 
-	interactiveMode(rl, bs, &keys)
-	parseInteractiveCommand(bs, &keys, "upload testdata/testdata1 abc/")
+	interactiveMode(c, rl)
+	parseInteractiveCommand(c, "upload testdata/testdata1 abc/")
 
-	dirs, err := getDirList(bs, &keys, "")
+	dirs, err := c.getDirList("")
 	assert.Nil(t, err)
 	assert.Equal(t, []string{"abc/testdata"}, dirs)
 
-	filesUploaded, err := getFileList(bs, &keys, "*")
+	filesUploaded, err := c.getFileList("*")
 	assert.Nil(t, err)
 	assert.Equal(t, []string{"abc/testdata/testdata1"}, filesUploaded)
 
-	parseInteractiveCommand(bs, &keys, "move abc/testdata/* /")
-	filesUploaded, err = getFileList(bs, &keys, "*")
+	parseInteractiveCommand(c, "move abc/testdata/* /")
+	filesUploaded, err = c.getFileList("*")
 	assert.Nil(t, err)
 	assert.Equal(t, []string{"testdata1"}, filesUploaded)
 
-	err = parseInteractiveCommand(bs, &keys, "download testdata1 /tmp/")
+	err = parseInteractiveCommand(c, "download testdata1 /tmp/")
 	assert.Nil(t, err)
 
-	parseInteractiveCommand(bs, &keys, "delete testdata1")
-	filesUploaded, err = getFileList(bs, &keys, "*")
+	parseInteractiveCommand(c, "delete testdata1")
+	filesUploaded, err = c.getFileList("*")
 	assert.Nil(t, err)
 	assert.Len(t, filesUploaded, 0)
 }

@@ -14,7 +14,8 @@ import (
 
 func TestDoUpload(t *testing.T) {
 	bs, keys := setupUp()
-	cleanUp(bs)
+	c := &client{&keys, bs, bucketCache{}}
+	cleanUp(c)
 
 	randomFileTestFilename := randomFile()
 	defer os.Remove(randomFileTestFilename)
@@ -74,13 +75,13 @@ func TestDoUpload(t *testing.T) {
 		{randomFileTestFilename, "", true, "", nil, []string{randomFileTestFilename}},
 	}
 
-	for c, e := range uploadTests {
-		log.Info("Running #", c)
+	for n, e := range uploadTests {
+		log.Info("Running #", n)
 
 		path := e.uploadFilepath
 		remoteDirectory := e.destinationDirectory
 
-		err := processUpload(bs, &keys, path, remoteDirectory)
+		err := c.processUpload(path, remoteDirectory)
 
 		if err != nil {
 			log.Debug("Error uploading: ", err)
@@ -89,7 +90,7 @@ func TestDoUpload(t *testing.T) {
 		assert.Equal(t, err, e.expectedError)
 
 		if e.expectedError == nil {
-			filesInBucket, err := getFileList(bs, &keys, "")
+			filesInBucket, err := c.getFileList("")
 			assert.Nil(t, err)
 			assert.EqualValues(t, filesInBucket, e.expectedStructure)
 		}
@@ -97,7 +98,7 @@ func TestDoUpload(t *testing.T) {
 		if e.expectedStructure != nil {
 			cwd, _ := os.Getwd()
 			tempDir, _ := ioutil.TempDir(cwd, "testrun")
-			err := doDownload(bs, &keys, "*", tempDir)
+			err := c.doDownload("*", tempDir)
 			assert.Nil(t, err)
 			switch e.srcType {
 			case "file":
@@ -117,29 +118,30 @@ func TestDoUpload(t *testing.T) {
 		}
 
 		if e.deleteAfterTest {
-			cleanUp(bs)
-			objectsAfterDelete, _ := bs.getObjects()
+			cleanUp(c)
+			objectsAfterDelete, _ := c.bucket.List()
 			assert.Empty(t, objectsAfterDelete, "Looks like objects still exist after deleting them all")
 		}
 
-		bs.bucketCache.seenFiles = make(map[string]string, 100)
+		c.bcache.seenFiles = make(map[string]string, 100)
 	}
 }
 
 func TestDoUploadResume(t *testing.T) {
 	bs, keys := setupUp()
-	defer cleanUp(bs)
+	c := &client{&keys, bs, bucketCache{}}
+	defer cleanUp(c)
 
-	err := processUpload(bs, &keys, "testdata/testdata1", "")
-	filesInBucket, err := getFileList(bs, &keys, "")
+	err := c.processUpload("testdata/testdata1", "")
+	filesInBucket, err := c.getFileList("")
 	assert.Nil(t, err)
 	assert.Equal(t, []string{"testdata/testdata1"}, filesInBucket)
 
 	// how to actually check the file was not reuploaded?
-	err = processUpload(bs, &keys, "testdata/testdata*", "testdata/")
+	err = c.processUpload("testdata/testdata*", "testdata/")
 	assert.Equal(t, err.Error(), fileUploadFailError)
 
-	filesInBucket, err = getFileList(bs, &keys, "")
+	filesInBucket, err = c.getFileList("")
 
 	assert.Nil(t, err)
 	assert.Equal(t, []string{
@@ -153,7 +155,8 @@ func TestDoUploadResume(t *testing.T) {
 
 func TestDoUploadDirectoryAndResume(t *testing.T) {
 	bs, keys := setupUp()
-	defer cleanUp(bs)
+	c := &client{&keys, bs, bucketCache{}}
+	defer cleanUp(c)
 
 	expectedOutput := []string{
 		"testdata/testdata1",
@@ -176,13 +179,12 @@ func TestDoUploadDirectoryAndResume(t *testing.T) {
 
 	sort.Strings(expectedOutput)
 
-	err := processUpload(bs, &keys, "testdata/testdata1", "")
+	err := c.processUpload("testdata/testdata1", "")
 	assert.Nil(t, err)
 
 	// how to actually check the file was not reuploaded?
-	err = processUpload(bs, &keys, "testdata", "")
-
-	filesInBucket, err := getFileList(bs, &keys, "")
+	err = c.processUpload("testdata", "")
+	filesInBucket, err := c.getFileList("")
 
 	sort.Strings(filesInBucket)
 	assert.EqualValues(t, expectedOutput, filesInBucket)
@@ -190,21 +192,22 @@ func TestDoUploadDirectoryAndResume(t *testing.T) {
 
 func TestExistingDirectoriesReused(t *testing.T) {
 	bs, keys := setupUp()
-	defer cleanUp(bs)
+	c := &client{&keys, bs, bucketCache{}}
+	defer cleanUp(c)
 
 	identicalRemoteDirectories := []string{}
 	identicalRemoteEncryptedDirectories := []string{}
 
-	processUpload(bs, &keys, "testdata", "testing-directories")
+	c.processUpload("testdata", "testing-directories")
 
-	filesInBucket, err := getFileList(bs, &keys, "")
+	filesInBucket, err := c.getFileList("")
 	for _, e := range filesInBucket {
 		if !searchForString(identicalRemoteDirectories, filepath.Dir(e)) {
 			identicalRemoteDirectories = append(identicalRemoteDirectories, filepath.Dir(e))
 		}
 	}
 
-	encryptedFilesInBucket, err := bs.getObjects()
+	encryptedFilesInBucket, err := c.bucket.List()
 	assert.Empty(t, err)
 
 	for _, e := range encryptedFilesInBucket {

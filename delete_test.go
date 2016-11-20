@@ -1,13 +1,15 @@
 package main
 
 import (
-	"github.com/stretchr/testify/assert"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestDoDeleteObject(t *testing.T) {
 	bs, keys := setupUp()
-	cleanUp(bs)
+	c := &client{&keys, bs, bucketCache{}}
+	cleanUp(c)
 
 	uploadTests := []struct {
 		uploadFilepath       string
@@ -22,9 +24,9 @@ func TestDoDeleteObject(t *testing.T) {
 	}
 
 	for _, e := range uploadTests {
-		if err := processUpload(bs, &keys, e.uploadFilepath, e.destinationDirectory); err == nil {
-			bs.doDeleteObject(&keys, e.destinationDirectory+"/"+e.uploadFilepath, false)
-			fileList, err := getFileList(bs, &keys, "")
+		if err := c.processUpload(e.uploadFilepath, e.destinationDirectory); err == nil {
+			c.doDeleteObject(e.destinationDirectory+"/"+e.uploadFilepath, false)
+			fileList, err := c.getFileList("")
 			assert.Empty(t, fileList)
 			assert.Empty(t, err)
 		} else if err != nil {
