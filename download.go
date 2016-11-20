@@ -3,13 +3,13 @@ package main
 import (
 	"errors"
 	_ "fmt"
-	"github.com/GregorioDiStefano/gcloud-crypto/simplecrypto"
-	"github.com/ryanuber/go-glob"
-	_ "google.golang.org/appengine/log"
 	"os"
 	"path"
 	"path/filepath"
 	"strings"
+
+	"github.com/GregorioDiStefano/gcloud-crypto/simplecrypto"
+	"github.com/ryanuber/go-glob"
 )
 
 const (
@@ -33,8 +33,8 @@ func moveDownload(source, destination string) error {
 	return os.Rename(source, destination)
 }
 
-func doDownload(bs *bucketService, keys *simplecrypto.Keys, downloadPath, destinationDir string) error {
-	objects, err := bs.getObjects()
+func (c *client) doDownload(downloadPath, destinationDir string) error {
+	objects, err := c.bucket.List()
 
 	if err != nil {
 		return errors.New("failed getting objects: " + err.Error())
@@ -47,7 +47,7 @@ func doDownload(bs *bucketService, keys *simplecrypto.Keys, downloadPath, destin
 		}
 	}
 
-	decToEncPaths := getDecryptedToEncryptedFileMapping(objects, keys)
+	decToEncPaths := getDecryptedToEncryptedFileMapping(objects, c.keys)
 	foundFile := false
 
 	for remotePlaintextPath := range decToEncPaths {
@@ -59,15 +59,15 @@ func doDownload(bs *bucketService, keys *simplecrypto.Keys, downloadPath, destin
 			log.Infof("Downloading: %s", remotePlaintextPath)
 
 			encryptedFilepath := decToEncPaths[remotePlaintextPath]
-			decryptedFilePath, _ := decryptFilePath(decToEncPaths[remotePlaintextPath], keys)
-			downloadedEncryptedFile, err := bs.downloadFromBucket(encryptedFilepath)
+			decryptedFilePath, _ := decryptFilePath(decToEncPaths[remotePlaintextPath], c.keys)
+			downloadedEncryptedFile, err := c.bucket.Download(encryptedFilepath)
 			defer os.Remove(downloadedEncryptedFile)
 
 			if err != nil {
 				return err
 			}
 
-			downloadedPlaintextFile, err := simplecrypto.DecryptFile(downloadedEncryptedFile, keys)
+			downloadedPlaintextFile, err := simplecrypto.DecryptFile(downloadedEncryptedFile, c.keys)
 
 			if err != nil {
 				return err

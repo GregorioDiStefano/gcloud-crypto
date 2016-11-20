@@ -5,14 +5,13 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/GregorioDiStefano/gcloud-crypto/simplecrypto"
 	_ "github.com/GregorioDiStefano/go-file-storage/log"
 	"github.com/Sirupsen/logrus"
 	"github.com/ryanuber/go-glob"
 )
 
-func (bs *bucketService) doMoveObject(keys *simplecrypto.Keys, src, dst string) error {
-	objects, err := bs.getObjects()
+func (c *client) doMoveObject(src, dst string) error {
+	objects, err := c.bucket.List()
 
 	if err != nil {
 		return errors.New("failed getting objects: " + err.Error())
@@ -22,7 +21,7 @@ func (bs *bucketService) doMoveObject(keys *simplecrypto.Keys, src, dst string) 
 		return errors.New("no objects exist remotely, nothing to move")
 	}
 
-	decToEncPaths := getDecryptedToEncryptedFileMapping(objects, keys)
+	decToEncPaths := getDecryptedToEncryptedFileMapping(objects, c.keys)
 	isGlob := strings.Contains(src, "*")
 
 	for plaintextFilename := range decToEncPaths {
@@ -31,17 +30,17 @@ func (bs *bucketService) doMoveObject(keys *simplecrypto.Keys, src, dst string) 
 		// this is a single file rename
 		if !strings.HasSuffix(src, "/") && !strings.HasSuffix(dst, "/") {
 			encryptedFilename := decToEncPaths[plaintextFilename]
-			finalDstEncrypted := encryptFilePath(dst, keys)
+			finalDstEncrypted := encryptFilePath(dst, c.keys)
 
 			log.WithFields(logrus.Fields{"original": plaintextFilename, "new location": finalDst}).Debug("file moved")
-			return bs.moveObject(encryptedFilename, finalDstEncrypted)
+			return c.bucket.Move(encryptedFilename, finalDstEncrypted)
 		}
 
 		// this is a directory rename
 		if strings.HasSuffix(src, "/") && strings.HasSuffix(dst, "/") && strings.HasPrefix(plaintextFilename, src) {
 			encryptedFilename := decToEncPaths[plaintextFilename]
-			finalDstEncrypted := encryptFilePath(filepath.Clean(filepath.Join(dst, plaintextFilename)), keys)
-			if err := bs.moveObject(encryptedFilename, finalDstEncrypted); err != nil {
+			finalDstEncrypted := encryptFilePath(filepath.Clean(filepath.Join(dst, plaintextFilename)), c.keys)
+			if err := c.bucket.Move(encryptedFilename, finalDstEncrypted); err != nil {
 				return err
 			}
 			continue
@@ -59,8 +58,8 @@ func (bs *bucketService) doMoveObject(keys *simplecrypto.Keys, src, dst string) 
 				finalDst = filepath.Clean(filepath.Join(dst, plaintextFilename))
 			}
 
-			finalDstEncrypted := encryptFilePath(finalDst, keys)
-			if err := bs.moveObject(encryptedFilename, finalDstEncrypted); err != nil {
+			finalDstEncrypted := encryptFilePath(finalDst, c.keys)
+			if err := c.bucket.Move(encryptedFilename, finalDstEncrypted); err != nil {
 				return err
 			}
 			log.WithFields(logrus.Fields{"original": plaintextFilename, "new location": finalDst}).Debug("file moved")

@@ -9,9 +9,10 @@ import (
 
 func TestHashMismatch(t *testing.T) {
 	bs, keys := setupUp()
-	cleanUp(bs)
+	c := &client{&keys, bs, bucketCache{}}
+	cleanUp(c)
 
-	getFileList(bs, &keys, "")
+	c.getFileList("")
 	file1 := encryptFilePath("test0", &keys)
 	file2 := encryptFilePath("test1", &keys)
 
@@ -19,17 +20,18 @@ func TestHashMismatch(t *testing.T) {
 	randomFileTestFilename2 := randomFile()
 
 	md5hash, _ := getFileMD5(randomFileTestFilename1)
-	err := bs.uploadToBucket(randomFileTestFilename1, &keys, md5hash, file1)
-
-	err = bs.uploadToBucket(randomFileTestFilename2, &keys, []byte{0x00}, file2)
+	err := bs.Upload(randomFileTestFilename1, file1, md5hash)
+	assert.Nil(t, err)
+	err = bs.Upload(randomFileTestFilename2, file2, []byte{0x00})
 	assert.Equal(t, err, errors.New(hashMismatchErr))
-	filesInBucket, err := getFileList(bs, &keys, "")
+	filesInBucket, err := c.getFileList("")
 	assert.Equal(t, []string{"test0"}, filesInBucket)
 }
 
 func TestMoveObject(t *testing.T) {
 	bs, keys := setupUp()
-	cleanUp(bs)
+	c := &client{&keys, bs, bucketCache{}}
+	cleanUp(c)
 
 	srcFile := encryptFilePath("test0", &keys)
 	dstFile := encryptFilePath("dst", &keys)
@@ -37,10 +39,10 @@ func TestMoveObject(t *testing.T) {
 	randomFileTestFilename := randomFile()
 	md5hash, _ := getFileMD5(randomFileTestFilename)
 
-	bs.uploadToBucket(randomFileTestFilename, &keys, md5hash, srcFile)
-	bs.moveObject(srcFile, dstFile)
+	bs.Upload(randomFileTestFilename, srcFile, md5hash)
+	bs.Move(srcFile, dstFile)
 
-	files, err := getFileList(bs, &keys, "")
+	files, err := c.getFileList("")
 
 	assert.Nil(t, err)
 	assert.Len(t, files, 1)

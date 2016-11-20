@@ -17,7 +17,8 @@ func TestDoDownload(t *testing.T) {
 	bs, keys := setupUp()
 
 	uploadPath := "testdata"
-	processUpload(bs, &keys, uploadPath, "")
+	c := client{&keys, bs, bucketCache{}}
+	c.processUpload(uploadPath, "")
 
 	downloadTests := []struct {
 		downloadGlob                 string
@@ -36,9 +37,8 @@ func TestDoDownload(t *testing.T) {
 
 	for _, e := range downloadTests {
 		defer os.RemoveAll(e.downloadDestinationDirectory)
-		err := doDownload(bs, &keys, e.downloadGlob, e.downloadDestinationDirectory)
+		err := c.doDownload(e.downloadGlob, e.downloadDestinationDirectory)
 
-		fmt.Println(getFileList(bs, &keys, ""))
 		assert.Equal(t, e.expectedError, err)
 
 		switch e.expectedStructureType {

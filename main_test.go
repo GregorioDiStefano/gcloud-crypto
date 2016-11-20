@@ -3,14 +3,15 @@ package main
 import (
 	"context"
 	"encoding/base64"
-	"github.com/GregorioDiStefano/gcloud-crypto/simplecrypto"
-	"github.com/Sirupsen/logrus"
-	"golang.org/x/oauth2/google"
-	storage "google.golang.org/api/storage/v1"
 	"io/ioutil"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/GregorioDiStefano/gcloud-crypto/simplecrypto"
+	"github.com/Sirupsen/logrus"
+	"golang.org/x/oauth2/google"
+	storage "google.golang.org/api/storage/v1"
 )
 
 const (
@@ -38,15 +39,17 @@ func setupUp() (*bucketService, simplecrypto.Keys) {
 
 	testingBucketPrefix := "gct-" + testStartTime + "-"
 	testingBucket := testingBucketPrefix + strings.ToLower(base64.RawURLEncoding.EncodeToString(randomByte(4)))
-	bs := NewBucketService(*service, testingBucket, gcsProjectID)
+	keys, err := simplecrypto.GetKeyFromPassphrase([]byte("testing"), []byte("salt1234"), 4096, 16, 1)
+
+	bs := NewGoogleBucketService(service, keys, testingBucket, gcsProjectID)
 
 	existingBucketsObj, _ := service.Buckets.List(gcsProjectID).Do()
 	for _, b := range existingBucketsObj.Items {
 		if strings.HasPrefix(b.Name, testingBucketPrefix) {
 
-			objs, _ := NewBucketService(*service, b.Name, gcsProjectID).getObjects()
+			objs, _ := NewGoogleBucketService(service, keys, b.Name, gcsProjectID).List()
 			for _, e := range objs {
-				NewBucketService(*service, b.Name, gcsProjectID).deleteObject(e)
+				NewGoogleBucketService(service, keys, b.Name, gcsProjectID).Delete(e)
 			}
 
 			log.Info("Removing old testing bucket: " + b.Name)
@@ -57,8 +60,6 @@ func setupUp() (*bucketService, simplecrypto.Keys) {
 	if _, err := (service.Buckets.Insert(gcsProjectID, &storage.Bucket{Name: testingBucket, Location: "eu"}).Do()); err != nil {
 		panic(err)
 	}
-
-	keys, err := simplecrypto.GetKeyFromPassphrase([]byte("testing"), []byte("salt1234"), 4096, 16, 1)
 
 	if err != nil {
 		panic(err)
@@ -83,8 +84,8 @@ func brokenSetupUp() (*bucketService, simplecrypto.Keys) {
 	userData.configFile.Set("bucket", "bad")
 	userData.configFile.Set("project_id", "bad")
 
-	bs := NewBucketService(*service, "bad", "bad")
 	keys, err := simplecrypto.GetKeyFromPassphrase([]byte("testing"), []byte("salt1234"), 4096, 16, 1)
+	bs := NewGoogleBucketService(service, keys, "bad", "bad")
 
 	if err != nil {
 		panic(err)
@@ -93,12 +94,13 @@ func brokenSetupUp() (*bucketService, simplecrypto.Keys) {
 	return bs, *keys
 }
 
-func cleanUp(bs *bucketService) {
-	objs, _ := bs.getObjects()
+func cleanUp(c *client) {
+	objs, _ := c.bucket.List()
 	for _, e := range objs {
-		bs.deleteObject(e)
+		c.bucket.Delete(e)
 	}
-	bs.bucketCache.seenFiles = make(map[string]string, 100)
+
+	c.bcache.seenFiles = make(map[string]string, 100)
 }
 
 func randomFile() string {

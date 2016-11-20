@@ -4,18 +4,17 @@ import (
 	"path/filepath"
 	"sort"
 
-	"github.com/GregorioDiStefano/gcloud-crypto/simplecrypto"
 	"github.com/ryanuber/go-glob"
 )
 
-func getDirList(bs *bucketService, key *simplecrypto.Keys, matchGlob string) ([]string, error) {
-	objects, err := bs.getObjects()
+func (c *client) getDirList(matchGlob string) ([]string, error) {
+	objects, err := c.bucket.List()
 	if err != nil {
 		return nil, err
 	}
 
 	dirs := []string{}
-	decToEncPaths := getDecryptedToEncryptedFileMapping(objects, key)
+	decToEncPaths := getDecryptedToEncryptedFileMapping(objects, c.keys)
 
 	for e := range decToEncPaths {
 		e = filepath.Dir(e)
@@ -34,13 +33,13 @@ func getDirList(bs *bucketService, key *simplecrypto.Keys, matchGlob string) ([]
 	return dirs, nil
 }
 
-func getFileList(bs *bucketService, key *simplecrypto.Keys, matchGlob string) ([]string, error) {
-	objects, err := bs.getObjects()
+func (c *client) getFileList(matchGlob string) ([]string, error) {
+	objects, err := c.bucket.List()
 	if err != nil {
 		return nil, err
 	}
 
-	decToEncPaths := getDecryptedToEncryptedFileMapping(objects, key)
+	decToEncPaths := getDecryptedToEncryptedFileMapping(objects, c.keys)
 
 	var keys []string
 	for k := range decToEncPaths {
