@@ -11,12 +11,12 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
+	"github.com/GregorioDiStefano/gcloud-crypto/progress"
 	"github.com/Sirupsen/logrus"
 	"golang.org/x/crypto/scrypt"
 	"io"
 	"io/ioutil"
 	"os"
-	"strings"
 )
 
 var log = logrus.New()
@@ -127,18 +127,8 @@ func DecryptText(cryptoText string, key []byte) (string, error) {
 }
 
 func (pg *progressBar) Write(b []byte) (n int, err error) {
-	pg.bytesRead = pg.bytesRead + int64(len(b))
-	percent := (float64(pg.bytesRead) / float64(pg.totalSize)) * 100
-
-	progress := strings.Repeat("=", int(percent)/2) + ">"
-	spaces := strings.Repeat(" ", 50-(int(percent)/2))
-
-	fmt.Print(fmt.Sprintf("Encrypting: %s %d%% (%d/%d)\r", progress+spaces, int(percent), pg.bytesRead, pg.totalSize))
-
-	if percent == 100 {
-		fmt.Println()
-	}
-
+	pg.bytesRead += int64(len(b))
+	progress.DrawProgress("Encrypting", pg.bytesRead, pg.totalSize)
 	return len(b), nil
 }
 
@@ -312,5 +302,7 @@ func addHMACToFile(file *os.File, hmac []byte) error {
 	}
 
 	file.Write(hmac)
+	file.Sync()
+
 	return nil
 }

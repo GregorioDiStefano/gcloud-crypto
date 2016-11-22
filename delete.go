@@ -2,22 +2,26 @@ package main
 
 import (
 	"errors"
-	"fmt"
 
-	"github.com/GregorioDiStefano/gcloud-crypto/simplecrypto"
+	_ "github.com/GregorioDiStefano/go-file-storage/log"
 	"github.com/Sirupsen/logrus"
 	"github.com/ryanuber/go-glob"
 )
 
-func (bs *bucketService) doDeleteObject(keys *simplecrypto.Keys, filepath string, encrypted bool) error {
-	objects, err := bs.getObjects()
+const (
+	errDeleteFileNotFound = "Delete file not found"
+)
+
+func (c *client) doDeleteObject(filepath string, encrypted bool) error {
+	fileFound := false
+	objects, err := c.bucket.List()
 
 	if err != nil {
 		return errors.New("failed getting objects: " + err.Error())
 	}
 
 	if encrypted {
-		filepath, err = decryptFilePath(filepath, keys)
+		filepath, err = decryptFilePath(filepath, c.keys)
 	}
 
 	if err != nil {
@@ -29,21 +33,24 @@ func (bs *bucketService) doDeleteObject(keys *simplecrypto.Keys, filepath string
 		return errors.New("not perform destructive delete")
 	}
 
-	decToEncPaths := getDecryptedToEncryptedFileMapping(objects, keys)
-	for plaintextFilename, _ := range decToEncPaths {
-
+	decToEncPaths := getDecryptedToEncryptedFileMapping(objects, c.keys)
+	for plaintextFilename := range decToEncPaths {
 		if glob.Glob(filepath, plaintextFilename) && plaintextFilename != PASSWORD_CHECK_FILE {
+			fileFound = true
 			encryptedFilename := decToEncPaths[plaintextFilename]
 			if encryptedFilename == "" {
-				return fmt.Errorf("file: %s not found in bucket", filepath)
+				return errors.New(errDeleteFileNotFound)
 			}
 
-			if err := bs.deleteObject(encryptedFilename); err != nil {
+			if err := c.bucket.Delete(encryptedFilename); err != nil {
 				return err
-			} else {
-				log.WithFields(logrus.Fields{"filename": plaintextFilename}).Debug("deleted file.")
 			}
+			log.WithFields(logrus.Fields{"filename": plaintextFilename}).Debug("deleted file.")
 		}
+	}
+
+	if !fileFound {
+		return errors.New(errDeleteFileNotFound)
 	}
 	return nil
 }

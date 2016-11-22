@@ -2,7 +2,6 @@ package main
 
 import (
 	"errors"
-	"os"
 	"path"
 	"path/filepath"
 	"strings"
@@ -17,27 +16,12 @@ const (
 	fileUploadFailError    = "at least one file failed to upload"
 )
 
-func relativePathFromGlob(glob, match string) string {
-	splitGlob := strings.Split(glob, "/")
-	splitMatch := strings.Split(match, "/")
-	commonPath := ""
-	for i, s := range splitGlob {
-		if splitMatch[i] == s {
-			commonPath += s + "/"
-		} else {
-			break
-		}
-	}
-
-	return strings.TrimPrefix(match, commonPath)
-}
-
 // reuseExistingEncryptedPath is an optimization: reuse already existing encrypted paths instead of
 // having the same encrypted path in different objects
-func reuseExistingEncryptedPath(bs bucketService, keys *simplecrypto.Keys, fullPlaintextRemoteUploadPath string) string {
-	for encryptedPath, decryptedPath := range bs.bucketCache.seenFiles {
+func (c *client) reuseExistingEncryptedPath(fullPlaintextRemoteUploadPath string) string {
+	for encryptedPath, decryptedPath := range c.bcache.seenFiles {
 		if filepath.Dir(decryptedPath) == filepath.Dir(fullPlaintextRemoteUploadPath) {
-			if encryptedFilename, err := simplecrypto.EncryptText(path.Base(fullPlaintextRemoteUploadPath), keys.EncryptionKey); err != nil {
+			if encryptedFilename, err := simplecrypto.EncryptText(path.Base(fullPlaintextRemoteUploadPath), c.keys.EncryptionKey); err != nil {
 				return ""
 			} else {
 				return filepath.Clean(filepath.Dir(encryptedPath) + "/" + encryptedFilename)
@@ -47,26 +31,11 @@ func reuseExistingEncryptedPath(bs bucketService, keys *simplecrypto.Keys, fullP
 	return ""
 }
 
-func globMatchWithDirectories(path string) []string {
-	globMatch, _ := filepath.Glob(path)
-	matches := []string{}
-
-	for _, matchedPath := range globMatch {
-		filepath.Walk(matchedPath, func(matchedPath string, info os.FileInfo, err error) error {
-			if !isDir(matchedPath) {
-				matches = append(matches, matchedPath)
-			}
-			return nil
-		})
-	}
-	return matches
-}
-
-func prepareAndDoUpload(bs *bucketService, uploadFile, remoteUploadPath string, keys *simplecrypto.Keys) error {
+func (c *client) prepareAndDoUpload(uploadFile, remoteUploadPath string) error {
 	finalEncryptedUploadPath := ""
 
-	for e := range bs.bucketCache.seenFiles {
-		plaintextFilepath, err := decryptFilePath(e, keys)
+	for e := range c.bcache.seenFiles {
+		plaintextFilepath, err := decryptFilePath(e, c.keys)
 		if err != nil {
 			log.Errorf("Unable to decrypt filepath: %s", e)
 			continue
@@ -77,25 +46,25 @@ func prepareAndDoUpload(bs *bucketService, uploadFile, remoteUploadPath string, 
 		}
 	}
 
-	encryptedFile, md5Hash, err := simplecrypto.EncryptFile(uploadFile, keys)
+	encryptedFile, md5Hash, err := simplecrypto.EncryptFile(uploadFile, c.keys)
 
 	if err != nil {
-		log.Error(err)
-	}
-
-	if finalEncryptedUploadPath = reuseExistingEncryptedPath(*bs, keys, remoteUploadPath); finalEncryptedUploadPath == "" {
-		finalEncryptedUploadPath = encryptFilePath(remoteUploadPath, keys)
-	}
-
-	if err := bs.uploadToBucket(encryptedFile, keys, md5Hash, finalEncryptedUploadPath); err != nil {
 		return err
 	}
 
-	bs.bucketCache.addFile(finalEncryptedUploadPath, remoteUploadPath)
+	if finalEncryptedUploadPath = c.reuseExistingEncryptedPath(remoteUploadPath); finalEncryptedUploadPath == "" {
+		finalEncryptedUploadPath = encryptFilePath(remoteUploadPath, c.keys)
+	}
+
+	if err := c.bucket.Upload(encryptedFile, finalEncryptedUploadPath, md5Hash); err != nil {
+		return err
+	}
+
+	c.bcache.addFile(finalEncryptedUploadPath, remoteUploadPath)
 	return nil
 }
 
-func processUpload(bs *bucketService, keys *simplecrypto.Keys, uploadPath, remoteDirectory string) error {
+func (c *client) processUpload(uploadPath, remoteDirectory string) error {
 	globMatches := globMatchWithDirectories(uploadPath)
 	errorOccuredWhileUploading := false
 
@@ -104,7 +73,7 @@ func processUpload(bs *bucketService, keys *simplecrypto.Keys, uploadPath, remot
 	}
 
 	// cache the list of all files before we start uploading
-	objects, err := bs.getObjects()
+	objects, err := c.bucket.List()
 
 	if err != nil {
 		log.Fatal("Unable to load remote objects")
@@ -112,8 +81,8 @@ func processUpload(bs *bucketService, keys *simplecrypto.Keys, uploadPath, remot
 	}
 
 	for _, encryptedFile := range objects {
-		decryptedFile, _ := decryptFilePath(encryptedFile, keys)
-		bs.bucketCache.addFile(encryptedFile, decryptedFile)
+		decryptedFile, _ := decryptFilePath(encryptedFile, c.keys)
+		c.bcache.addFile(encryptedFile, decryptedFile)
 	}
 
 	for _, fileToUpload := range globMatches {
@@ -123,7 +92,7 @@ func processUpload(bs *bucketService, keys *simplecrypto.Keys, uploadPath, remot
 		} else {
 			newUploadDirectory = filepath.Join(remoteDirectory, fileToUpload)
 		}
-		if err := prepareAndDoUpload(bs, fileToUpload, newUploadDirectory, keys); err != nil {
+		if err := c.prepareAndDoUpload(fileToUpload, newUploadDirectory); err != nil {
 			if err != nil {
 				errorOccuredWhileUploading = true
 				switch err.Error() {

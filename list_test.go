@@ -8,7 +8,8 @@ import (
 
 func TestDirsListing(t *testing.T) {
 	bs, keys := setupUp()
-	cleanUp(bs)
+	c := &client{&keys, bs, bucketCache{}}
+	cleanUp(c)
 
 	dirListTests := []struct {
 		uploadFilepath       string
@@ -54,21 +55,23 @@ func TestDirsListing(t *testing.T) {
 
 	for _, e := range dirListTests {
 		if e.uploadFilepath != "" {
-			err := processUpload(bs, &keys, e.uploadFilepath, e.destinationDirectory)
+			err := c.processUpload(e.uploadFilepath, e.destinationDirectory)
 			assert.Nil(t, err)
 		}
 
-		dirsInBucket, err := getDirList(bs, &keys, e.searchGlob)
+		dirsInBucket, err := c.getDirList(e.searchGlob)
 		assert.Nil(t, err)
 		assert.EqualValues(t, e.expectedOutput, dirsInBucket)
-		cleanUp(bs)
+		cleanUp(c)
 	}
 
 }
 
 func TestFileListing(t *testing.T) {
 	bs, keys := setupUp()
-	cleanUp(bs)
+
+	c := &client{&keys, bs, bucketCache{}}
+	cleanUp(c)
 
 	dirListTests := []struct {
 		uploadFilepath       string
@@ -101,11 +104,11 @@ func TestFileListing(t *testing.T) {
 
 	for _, e := range dirListTests {
 		if e.uploadFilepath != "" {
-			err := processUpload(bs, &keys, e.uploadFilepath, e.destinationDirectory)
+			err := c.processUpload(e.uploadFilepath, e.destinationDirectory)
 			assert.Nil(t, err)
 		}
 
-		filesInBucket, err := getFileList(bs, &keys, "")
+		filesInBucket, err := c.getFileList("")
 		assert.Nil(t, err)
 		assert.EqualValues(t, e.expectedOutput, filesInBucket)
 	}
