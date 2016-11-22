@@ -63,24 +63,13 @@ func main() {
 	}
 
 	userData := parseConfig()
-
-	fmt.Print("Password: ")
-
-	password, err := terminal.ReadPassword(syscall.Stdin)
-
-	fmt.Println()
-	fmt.Println()
-
-	if err != nil {
-		panic(err)
-	}
-
 	rl, err := setupReadline()
 
 	if err != nil {
 		panic(err)
 	}
 
+	password := getPasswordFromTerminal()
 	keys, err := simplecrypto.GetKeyFromPassphrase(password, userData.salt, 8192, 16, 128)
 
 	if err != nil {
@@ -130,4 +119,19 @@ func verifyPassword(bucket Bucket, keys *simplecrypto.Keys) error {
 		}
 	}
 	return nil
+}
+
+func getPasswordFromTerminal() []byte {
+	fmt.Print("Password: ")
+	password, err := terminal.ReadPassword(syscall.Stdin)
+
+	fmt.Println()
+	fmt.Println()
+
+	if err != nil {
+		// panic since this is fatal.
+		panic(err)
+	}
+
+	return password
 }
