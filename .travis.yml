@@ -10,6 +10,7 @@ before_script:
 - tar xvf config.tar
 - go vet ./simplecrypto
 - go vet .
+- if [[ -n `go fmt` ]]; then echo "go fmt validation failed" && exit 1; fi
 - go test -v -coverprofile=coverage.txt -covermode=atomic
 script:
 - VERSION=0.0.1 make build
