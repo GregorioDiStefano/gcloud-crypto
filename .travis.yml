@@ -3,7 +3,6 @@ language:
 
 go:
 - 1.7.3
-- tip
 install:
 - go get "github.com/stretchr/testify"
 - go get ./...
