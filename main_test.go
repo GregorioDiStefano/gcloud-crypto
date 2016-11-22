@@ -3,13 +3,17 @@ package main
 import (
 	"context"
 	"encoding/base64"
+	"encoding/hex"
 	"io/ioutil"
+	"os"
 	"strconv"
 	"strings"
+	"testing"
 	"time"
 
 	"github.com/GregorioDiStefano/gcloud-crypto/simplecrypto"
 	"github.com/Sirupsen/logrus"
+	"github.com/stretchr/testify/assert"
 	"golang.org/x/oauth2/google"
 	storage "google.golang.org/api/storage/v1"
 )
@@ -116,4 +120,35 @@ func searchForString(slice []string, s string) bool {
 		}
 	}
 	return false
+}
+
+func TestVerifyPassword(t *testing.T) {
+	bs, keys := setupUp()
+	c := client{&keys, bs, bucketCache{}}
+
+	tf, _ := ioutil.TempFile("/tmp", "testing")
+	defer os.Remove(tf.Name())
+
+	// test with correct password
+	tf.WriteString("oEFyYW0rbdcMOif8pzS8McO4tVRvHvX6uVNTkmYad4sPcQ4M")
+	md5hex, err := hex.DecodeString("3483ba92a60078005e30a70200e0827b")
+	assert.Nil(t, err)
+
+	err = c.bucket.Upload(tf.Name(), PASSWORD_CHECK_FILE, md5hex)
+	assert.Nil(t, err)
+
+	err = verifyPassword(bs, &keys)
+	assert.Nil(t, err)
+
+	// test when keycontents doesn't match password
+	tf2, _ := ioutil.TempFile("/tmp", "testing")
+	tf2.WriteString("wrongpasssword")
+	md5hex, err = hex.DecodeString("deadbeef")
+	assert.Nil(t, err)
+
+	err = c.bucket.Upload(tf2.Name(), PASSWORD_CHECK_FILE, md5hex)
+	assert.Nil(t, err)
+
+	err = verifyPassword(bs, &keys)
+	assert.NotNil(t, err)
 }
