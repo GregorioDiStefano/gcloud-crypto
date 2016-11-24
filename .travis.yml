@@ -8,6 +8,7 @@ install:
 - go get ./...
 before_script:
 - tar xvf config.tar
+- go fmt ./...
 - go vet ./simplecrypto
 - go vet .
 - if [[ -n `go fmt` ]]; then echo "go fmt validation failed" && exit 1; fi
